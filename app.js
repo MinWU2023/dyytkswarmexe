@@ -336,6 +336,65 @@
     busy: false
   };
 
+  /** 来自 API 的安装包目录；空则回退 CFG 本地列表 */
+  var envCatalog = {
+    node: [],
+    bit: []
+  };
+
+  function clientEnvPlatform() {
+    return APP.platform === 'darwin' ? 'mac' : 'win';
+  }
+
+  function absApiUrl(u) {
+    var s = String(u || '').trim();
+    if (!s) return '';
+    if (/^https?:\/\//i.test(s)) return s;
+    return getApiBase() + (s.charAt(0) === '/' ? s : '/' + s);
+  }
+
+  function mapEnvCatalogItem(it) {
+    var downloadUrl = absApiUrl(it.downloadUrl || it.url || '');
+    return {
+      id: String(it.id),
+      version: String(it.version || ''),
+      label: String(it.label || it.title || it.version || it.id),
+      recommended: !!(it.recommended || it.isRecommended),
+      downloadUrl: downloadUrl,
+      winUrl: downloadUrl,
+      macUrl: downloadUrl,
+      fileName: String(it.fileName || '')
+    };
+  }
+
+  function nodeVersionList() {
+    return (envCatalog.node && envCatalog.node.length) ? envCatalog.node : (CFG.nodeVersions || []);
+  }
+
+  function bitVersionList() {
+    return (envCatalog.bit && envCatalog.bit.length) ? envCatalog.bit : (CFG.bitVersions || []);
+  }
+
+  async function loadEnvCatalogs() {
+    var plat = clientEnvPlatform();
+    var nodeList = CFG.nodeVersions || [];
+    var bitList = CFG.bitVersions || [];
+    try {
+      var nodeCat = await apiGet('/env-installers/catalog?kind=node&platform=' + encodeURIComponent(plat));
+      var nItems = (nodeCat && nodeCat.items) || [];
+      if (nItems.length) nodeList = nItems.map(mapEnvCatalogItem);
+    } catch (e) { /* 网络失败时用本地兜底 */ }
+    try {
+      var bitCat = await apiGet('/env-installers/catalog?kind=bit&platform=' + encodeURIComponent(plat));
+      var bItems = (bitCat && bitCat.items) || [];
+      if (bItems.length) bitList = bItems.map(mapEnvCatalogItem);
+    } catch (e2) { /* 同上 */ }
+    envCatalog.node = nodeList;
+    envCatalog.bit = bitList;
+    fillEnvVersionSelect('node-ver-select', envCatalog.node);
+    fillEnvVersionSelect('bit-ver-select', envCatalog.bit);
+  }
+
   function pickRecommended(list) {
     var items = list || [];
     for (var i = 0; i < items.length; i++) {
@@ -357,7 +416,7 @@
     sel.innerHTML = items.map(function (v) {
       return '<option value="' + esc(v.id) + '">' + esc(v.label || v.id) + '</option>';
     }).join('');
-    if (rec) sel.value = rec.id;
+    if (rec) sel.value = String(rec.id);
     refreshPrettySelect(sel);
   }
 
@@ -547,7 +606,7 @@
     }) : null;
     try {
       if (kind === 'node' && action === 'install') {
-        var nv = getSelectedEnvVersion('node-ver-select', CFG.nodeVersions);
+        var nv = getSelectedEnvVersion('node-ver-select', nodeVersionList());
         if (!nv) throw new Error('请选择 Node 版本');
         await DESK.installNode(nv);
         toast('Node.js 安装流程已完成', 'ok');
@@ -571,7 +630,11 @@
           toast('Node.js 已卸载', 'ok');
         }
       } else if (kind === 'bit' && action === 'install') {
-        var bv = getSelectedEnvVersion('bit-ver-select', CFG.bitVersions);
+        var bv = getSelectedEnvVersion('bit-ver-select', bitVersionList());
+        if (!bv) throw new Error('请选择比特版本');
+        if (!bv.downloadUrl && !bv.winUrl && !bv.macUrl) {
+          throw new Error('该版本暂无安装包直链，请在运营后台「环境安装包」上传/填写链接并发布');
+        }
         await DESK.installBit({ version: bv });
         toast('比特安装流程已完成', 'ok');
       } else if (kind === 'bit' && action === 'uninstall') {
@@ -590,7 +653,7 @@
       } else if (kind === 'bit' && action === 'local') {
         var file = await DESK.pickInstallerFile();
         if (!file) return;
-        var bv2 = getSelectedEnvVersion('bit-ver-select', CFG.bitVersions);
+        var bv2 = getSelectedEnvVersion('bit-ver-select', bitVersionList());
         await DESK.installBit({ version: bv2, localFile: file });
         toast('已启动本地安装包', 'ok');
       }
@@ -1037,6 +1100,7 @@
       localStorage.removeItem(LS.bit);
       openSettings();
       toast('已恢复默认', 'ok');
+      loadEnvCatalogs().catch(function () { /* ignore */ });
     });
     $('settings-form') && $('settings-form').addEventListener('submit', function (e) {
       e.preventDefault();
@@ -1048,6 +1112,7 @@
       toast('设置已保存', 'ok');
       recheckAll();
       loadVersions();
+      loadEnvCatalogs().catch(function () { /* ignore */ });
       if (currentPage === 'docs') loadDocsPage();
     });
 
@@ -1135,14 +1200,15 @@
     var foot = $('footer-ver');
     if (foot) foot.textContent = (CFG.appName || 'Dyy TKSwarm Client') + ' v' + APP.version;
 
-    fillEnvVersionSelect('node-ver-select', CFG.nodeVersions);
-    fillEnvVersionSelect('bit-ver-select', CFG.bitVersions);
+    fillEnvVersionSelect('node-ver-select', CFG.nodeVersions || []);
+    fillEnvVersionSelect('bit-ver-select', CFG.bitVersions || []);
     enhanceAllSelects();
 
     bind();
     updatePills();
     recheckAll();
     loadVersions();
+    loadEnvCatalogs().catch(function () { /* ignore */ });
   }
 
   if (document.readyState === 'loading') {

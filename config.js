@@ -1,7 +1,8 @@
 /**
  * Dyy TKSwarm Client 默认配置
- * Node 有官方版本直链，可自动下载安装；
- * 比特官网通常无稳定直链：安装时打开下载页并监控「下载」目录，也可选择本地安装包。
+ * Node / 比特版本优先从 API「环境安装包」目录拉取（按 win|mac），
+ * 客户端选择版本后直链下载并自动安装，不再打开浏览器手动下载。
+ * 下列列表仅作 API 不可用时的本地兜底。
  */
 window.__TKSWARM_EXE_CONFIG__ = {
   appName: 'Dyy TKSwarm Client',
@@ -14,13 +15,11 @@ window.__TKSWARM_EXE_CONFIG__ = {
     bit: 'https://www.bitbrowser.cn/',
     bitDownload: 'https://www.bitbrowser.cn/download'
   },
-  /**
-   * 适配视频矩阵的主流 Node 版本（Electron/CDP/Playwright 友好）
-   * recommended: 自动选中的最佳版本
-   */
+  /** API 不可用时的 Node 兜底（含官方直链） */
   nodeVersions: [
     {
       id: '22.14.0',
+      version: '22.14.0',
       label: '22.14.0 LTS（推荐·视频矩阵）',
       recommended: true,
       winUrl: 'https://nodejs.org/dist/v22.14.0/node-v22.14.0-x64.msi',
@@ -28,43 +27,13 @@ window.__TKSWARM_EXE_CONFIG__ = {
     },
     {
       id: '20.18.1',
+      version: '20.18.1',
       label: '20.18.1 LTS（兼容）',
       recommended: false,
       winUrl: 'https://nodejs.org/dist/v20.18.1/node-v20.18.1-x64.msi',
       macUrl: 'https://nodejs.org/dist/v20.18.1/node-v20.18.1.pkg'
-    },
-    {
-      id: '18.20.5',
-      label: '18.20.5 LTS（旧环境）',
-      recommended: false,
-      winUrl: 'https://nodejs.org/dist/v18.20.5/node-v18.20.5-x64.msi',
-      macUrl: 'https://nodejs.org/dist/v18.20.5/node-v18.20.5.pkg'
     }
   ],
-  /**
-   * 比特主流版本（推荐最新稳定）。若后续有直链可填 winUrl。
-   */
-  bitVersions: [
-    {
-      id: '7.1.4',
-      label: '7.1.4（推荐·适配视频矩阵）',
-      recommended: true,
-      downloadPage: 'https://www.bitbrowser.cn/download',
-      winUrl: ''
-    },
-    {
-      id: '7.1.3',
-      label: '7.1.3',
-      recommended: false,
-      downloadPage: 'https://www.bitbrowser.cn/download',
-      winUrl: ''
-    },
-    {
-      id: '7.1.2',
-      label: '7.1.2',
-      recommended: false,
-      downloadPage: 'https://www.bitbrowser.cn/download',
-      winUrl: ''
-    }
-  ]
+  /** API 不可用且无直链时无法自动安装比特，需后台发布或「选择安装包」 */
+  bitVersions: []
 };
