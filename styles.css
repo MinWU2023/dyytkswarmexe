@@ -352,6 +352,7 @@ body {
 }
 .status.checking { color: #5a6f8c; background: #eef3fa; }
 .status.online { color: #067a52; background: #e6f8f0; border-color: rgba(15,159,110,0.2); }
+.status.installed { color: #1a5fb4; background: #e8f1ff; border-color: rgba(26,125,255,0.22); }
 .status.offline { color: #b42318; background: #fdecec; border-color: rgba(214,69,69,0.18); }
 .status.warn { color: #9a6700; background: #fff6e0; border-color: rgba(201,133,18,0.22); }
 
@@ -452,6 +453,154 @@ body {
   min-width: 200px;
   max-width: min(360px, 42vw);
 }
+
+/* 自定义下拉：美化弹出层（原生 select 弹出层无法样式化） */
+.select-pretty {
+  position: relative;
+  display: inline-flex;
+  vertical-align: middle;
+  min-width: 0;
+}
+.select-pretty.select-version,
+.env-row .select-pretty,
+.panel-acts .select-pretty {
+  flex: 1;
+  min-width: 140px;
+}
+.select-pretty.select-version { max-width: min(360px, 42vw); }
+.select-pretty > select.select {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  clip: rect(0, 0, 0, 0);
+}
+.select-trigger {
+  appearance: none;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+  text-align: left;
+  padding: 9px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: linear-gradient(180deg, #ffffff 0%, #f7fbff 100%);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.9), 0 4px 12px rgba(26, 90, 180, 0.04);
+  cursor: pointer;
+  transition: border-color 0.18s, box-shadow 0.18s, background 0.18s;
+}
+.select-trigger:hover {
+  border-color: rgba(26, 125, 255, 0.28);
+  box-shadow: 0 6px 16px rgba(26, 125, 255, 0.08);
+}
+.select-pretty.open .select-trigger,
+.select-trigger:focus {
+  outline: none;
+  border-color: rgba(26, 125, 255, 0.45);
+  box-shadow: 0 0 0 3px rgba(26, 125, 255, 0.12), 0 8px 20px rgba(26, 125, 255, 0.1);
+  background: #fff;
+}
+.select-trigger-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.select-trigger-text.is-placeholder { color: var(--muted); font-weight: 500; }
+.select-caret {
+  flex-shrink: 0;
+  width: 16px; height: 16px;
+  color: var(--primary);
+  transition: transform 0.2s ease;
+}
+.select-pretty.open .select-caret { transform: rotate(180deg); }
+
+.select-panel {
+  position: absolute;
+  z-index: 80;
+  left: 0;
+  right: 0;
+  top: calc(100% + 6px);
+  max-height: min(280px, 42vh);
+  overflow: auto;
+  padding: 6px;
+  border-radius: 14px;
+  border: 1px solid rgba(26, 125, 255, 0.16);
+  background: rgba(255, 255, 255, 0.96);
+  backdrop-filter: blur(16px);
+  box-shadow:
+    0 18px 40px rgba(15, 40, 90, 0.14),
+    0 4px 12px rgba(26, 125, 255, 0.08),
+    inset 0 1px 0 rgba(255,255,255,0.9);
+  opacity: 0;
+  transform: translateY(-6px) scale(0.98);
+  pointer-events: none;
+  transition: opacity 0.16s ease, transform 0.16s ease;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(26,125,255,0.35) transparent;
+}
+.select-pretty.open .select-panel {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  pointer-events: auto;
+}
+.select-panel.drop-up {
+  top: auto;
+  bottom: calc(100% + 6px);
+}
+.select-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 550;
+  color: var(--ink-soft);
+  padding: 10px 12px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+}
+.select-option:hover,
+.select-option.is-active {
+  background: rgba(26, 125, 255, 0.08);
+  color: var(--primary);
+}
+.select-option.is-selected {
+  background: linear-gradient(135deg, rgba(26, 125, 255, 0.14), rgba(0, 180, 216, 0.1));
+  color: var(--primary);
+  font-weight: 700;
+}
+.select-option.is-selected::after {
+  content: "";
+  margin-left: auto;
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--primary), var(--primary-2));
+  box-shadow: 0 0 0 3px rgba(26, 125, 255, 0.15);
+}
+.select-option:disabled,
+.select-option.is-disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.ticket-grid .select-pretty { width: 100%; }
+.ticket-grid .select-pretty > select.select { /* keep hidden */ }
 
 .latest-banner {
   display: grid;

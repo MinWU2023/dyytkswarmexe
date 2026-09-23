@@ -98,12 +98,181 @@
       .replace(/'/g, '&#39;');
   }
 
+  /* —— 自定义下拉：美化弹出层，同步原生 select —— */
+  var prettySelects = [];
+
+  function closeAllPrettySelects(except) {
+    prettySelects.forEach(function (inst) {
+      if (inst !== except) inst.close();
+    });
+  }
+
+  function enhanceSelect(sel) {
+    if (!sel || sel.tagName !== 'SELECT' || sel.dataset.pretty === '1') return null;
+    sel.dataset.pretty = '1';
+
+    var wrap = document.createElement('div');
+    wrap.className = 'select-pretty' + (sel.classList.contains('select-version') ? ' select-version' : '');
+    sel.parentNode.insertBefore(wrap, sel);
+    wrap.appendChild(sel);
+
+    var trigger = document.createElement('button');
+    trigger.type = 'button';
+    trigger.className = 'select-trigger';
+    trigger.setAttribute('aria-haspopup', 'listbox');
+    trigger.innerHTML =
+      '<span class="select-trigger-text"></span>'
+      + '<svg class="select-caret" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true">'
+      + '<path d="M6 9l6 6 6-6"/></svg>';
+    wrap.appendChild(trigger);
+
+    var panel = document.createElement('div');
+    panel.className = 'select-panel';
+    panel.setAttribute('role', 'listbox');
+    wrap.appendChild(panel);
+
+    var textEl = trigger.querySelector('.select-trigger-text');
+    var open = false;
+    var inst = null;
+
+    function syncLabel() {
+      var opt = sel.options[sel.selectedIndex];
+      var label = opt ? String(opt.textContent || '').trim() : '';
+      var empty = !sel.value && (!opt || !label || /加载|暂无|请选择/.test(label));
+      textEl.textContent = label || '请选择';
+      textEl.classList.toggle('is-placeholder', empty || !label);
+    }
+
+    function rebuildOptions() {
+      panel.innerHTML = '';
+      Array.prototype.forEach.call(sel.options, function (opt, idx) {
+        var btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'select-option';
+        btn.setAttribute('role', 'option');
+        btn.dataset.index = String(idx);
+        btn.textContent = opt.textContent;
+        if (opt.disabled) {
+          btn.disabled = true;
+          btn.classList.add('is-disabled');
+        }
+        if (opt.selected) btn.classList.add('is-selected');
+        btn.addEventListener('click', function (e) {
+          e.preventDefault();
+          e.stopPropagation();
+          if (opt.disabled) return;
+          sel.selectedIndex = idx;
+          sel.dispatchEvent(new Event('change', { bubbles: true }));
+          syncLabel();
+          rebuildOptions();
+          close();
+        });
+        btn.addEventListener('mouseenter', function () {
+          panel.querySelectorAll('.select-option').forEach(function (el) {
+            el.classList.remove('is-active');
+          });
+          btn.classList.add('is-active');
+        });
+        panel.appendChild(btn);
+      });
+      syncLabel();
+    }
+
+    function placePanel() {
+      panel.classList.remove('drop-up');
+      var rect = trigger.getBoundingClientRect();
+      var spaceBelow = window.innerHeight - rect.bottom;
+      if (spaceBelow < 220 && rect.top > spaceBelow) {
+        panel.classList.add('drop-up');
+      }
+    }
+
+    function openPanel() {
+      if (sel.disabled) return;
+      closeAllPrettySelects(inst);
+      open = true;
+      wrap.classList.add('open');
+      trigger.setAttribute('aria-expanded', 'true');
+      placePanel();
+      rebuildOptions();
+    }
+
+    function close() {
+      open = false;
+      wrap.classList.remove('open');
+      trigger.setAttribute('aria-expanded', 'false');
+    }
+
+    function toggle() {
+      if (open) close();
+      else openPanel();
+    }
+
+    trigger.addEventListener('click', function (e) {
+      e.preventDefault();
+      e.stopPropagation();
+      toggle();
+    });
+    wrap.addEventListener('click', function (e) {
+      e.stopPropagation();
+    });
+
+    sel.addEventListener('change', function () {
+      syncLabel();
+      rebuildOptions();
+    });
+
+    var mo = new MutationObserver(function () {
+      rebuildOptions();
+    });
+    mo.observe(sel, { childList: true, subtree: true, attributes: true, attributeFilter: ['disabled'] });
+
+    inst = {
+      el: sel,
+      wrap: wrap,
+      close: close,
+      refresh: rebuildOptions,
+      open: openPanel
+    };
+    prettySelects.push(inst);
+    rebuildOptions();
+    return inst;
+  }
+
+  function enhanceAllSelects() {
+    document.querySelectorAll('select.select').forEach(function (sel) {
+      enhanceSelect(sel);
+    });
+  }
+
+  function refreshPrettySelect(selOrId) {
+    var sel = typeof selOrId === 'string' ? $(selOrId) : selOrId;
+    if (!sel) return;
+    var inst = prettySelects.find(function (x) { return x.el === sel; });
+    if (inst) inst.refresh();
+    else enhanceSelect(sel);
+  }
+
+  document.addEventListener('click', function () {
+    closeAllPrettySelects(null);
+  });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') closeAllPrettySelects(null);
+  });
+
   function setStatus(key, state, meta) {
     var badge = $('status-' + key);
     var metaEl = $('meta-' + key);
     if (badge) {
       badge.className = 'status ' + state;
-      badge.textContent = state === 'online' ? '已就绪' : state === 'offline' ? '未检测到' : state === 'warn' ? '不确定' : '检测中';
+      var labels = {
+        online: '已就绪',
+        installed: '已安装',
+        offline: '未安装',
+        warn: '待确认',
+        checking: '检测中'
+      };
+      badge.textContent = labels[state] || '检测中';
     }
     if (metaEl) metaEl.innerHTML = meta || '';
   }
@@ -181,6 +350,7 @@
     var items = list || [];
     if (!items.length) {
       sel.innerHTML = '<option value="">暂无版本</option>';
+      refreshPrettySelect(sel);
       return;
     }
     var rec = pickRecommended(items);
@@ -188,6 +358,7 @@
       return '<option value="' + esc(v.id) + '">' + esc(v.label || v.id) + '</option>';
     }).join('');
     if (rec) sel.value = rec.id;
+    refreshPrettySelect(sel);
   }
 
   function getSelectedEnvVersion(selectId, list) {
@@ -295,7 +466,8 @@
       setStatus('node', 'offline', installTip + '<br>可选择推荐版本后点击「安装」。');
       return false;
     }
-    setStatus('node', 'warn',
+    // 本机 Node 已装，只是业务服务未起 —— 显示「已安装」，不要「不确定」
+    setStatus('node', 'installed',
       installTip + '<br>服务未启动（默认 <code>127.0.0.1:8400</code>），请部署并启动代码包。');
     return false;
   }
@@ -352,7 +524,8 @@
       setStatus('bit', 'offline', installTip + '<br>可选择版本安装，或「选择安装包安装」。');
       return false;
     }
-    setStatus('bit', 'warn',
+    // 已安装但本地 API 未开 —— 显示「已安装」
+    setStatus('bit', 'installed',
       installTip + '<br>请启动比特并开启本地 API <code>' + esc(base) + '</code>');
     return false;
   }
@@ -379,13 +552,39 @@
         await DESK.installNode(nv);
         toast('Node.js 安装流程已完成', 'ok');
       } else if (kind === 'node' && action === 'uninstall') {
-        await DESK.uninstallNode();
-        toast('Node.js 已卸载', 'ok');
+        if (DESK.showConfirm) {
+          var okNode = await DESK.showConfirm({
+            title: '卸载 Node.js',
+            message: '将按本机安装方式卸载当前 Node（nvm 或官方安装包）。',
+            detail: '若使用 nvm，仅卸载当前版本，其他版本仍保留。官方 MSI 会弹出 UAC。',
+            buttons: ['取消', '继续卸载'],
+            confirmIndex: 1
+          });
+          if (!okNode) return;
+        }
+        var nodeUn = await DESK.uninstallNode();
+        if (nodeUn && nodeUn.method === 'nvm' && nodeUn.currentVersion) {
+          toast('已卸载 v' + nodeUn.removedVersion + '，当前仍可用 v' + nodeUn.currentVersion, 'ok');
+        } else if (nodeUn && nodeUn.method === 'nvm') {
+          toast('已卸载 Node.js v' + (nodeUn.removedVersion || ''), 'ok');
+        } else {
+          toast('Node.js 已卸载', 'ok');
+        }
       } else if (kind === 'bit' && action === 'install') {
         var bv = getSelectedEnvVersion('bit-ver-select', CFG.bitVersions);
         await DESK.installBit({ version: bv });
         toast('比特安装流程已完成', 'ok');
       } else if (kind === 'bit' && action === 'uninstall') {
+        if (DESK.showConfirm) {
+          var okUn = await DESK.showConfirm({
+            title: '卸载比特浏览器',
+            message: '将结束比特进程并启动官方卸载程序。',
+            detail: '若弹出 UAC 请点「是」。卸载窗口里请点完成/卸载，不要直接关掉。',
+            buttons: ['取消', '继续卸载'],
+            confirmIndex: 1
+          });
+          if (!okUn) return;
+        }
         await DESK.uninstallBit();
         toast('比特浏览器已卸载', 'ok');
       } else if (kind === 'bit' && action === 'local') {
@@ -626,6 +825,7 @@
     if (!items || !items.length) {
       sel.innerHTML = '<option value=\"\">暂无已发布版本</option>';
       renderLatest(null);
+      refreshPrettySelect(sel);
       return;
     }
     var latestId = '';
@@ -644,15 +844,20 @@
       : (latestId || String(items[0].id != null ? items[0].id : items[0].version));
     sel.value = pick;
     renderLatest(catalogById[pick] || items[0]);
+    refreshPrettySelect(sel);
   }
 
   async function loadVersions() {
     var channel = getChannel();
     var chSel = $('channel-select');
     if (chSel) chSel.value = channel;
+    refreshPrettySelect(chSel);
     updatePills();
     var verSel = $('version-select');
-    if (verSel) verSel.innerHTML = '<option value=\"\">加载版本…</option>';
+    if (verSel) {
+      verSel.innerHTML = '<option value=\"\">加载版本…</option>';
+      refreshPrettySelect(verSel);
+    }
     try {
       var catalog = await apiGet('/client-versions/catalog?channel=' + encodeURIComponent(channel));
       var items = (catalog && catalog.items) || (Array.isArray(catalog) ? catalog : []);
@@ -932,6 +1137,7 @@
 
     fillEnvVersionSelect('node-ver-select', CFG.nodeVersions);
     fillEnvVersionSelect('bit-ver-select', CFG.bitVersions);
+    enhanceAllSelects();
 
     bind();
     updatePills();
