@@ -109,21 +109,7 @@
   }
 
   function updatePills() {
-    var apiPill = $('pill-api');
-    var chPill = $('pill-channel');
-    var platPill = $('pill-platform');
-    if (apiPill) {
-      try {
-        apiPill.textContent = 'API · ' + new URL(getApiBase()).host;
-      } catch (e) {
-        apiPill.textContent = 'API · ' + getApiBase();
-      }
-    }
-    if (chPill) chPill.textContent = '通道 · ' + getChannel();
-    if (platPill) {
-      var label = APP.platform === 'darwin' ? 'macOS' : APP.platform === 'win32' ? 'Windows' : APP.platform;
-      platPill.textContent = '平台 · ' + label;
-    }
+    /* 顶部状态胶囊已移除 */
   }
 
   function showProgress(show, message, percent) {
@@ -175,49 +161,255 @@
     }
   }
 
+  var envState = {
+    nodeInstalled: false,
+    bitInstalled: false,
+    busy: false
+  };
+
+  function pickRecommended(list) {
+    var items = list || [];
+    for (var i = 0; i < items.length; i++) {
+      if (items[i].recommended) return items[i];
+    }
+    return items[0] || null;
+  }
+
+  function fillEnvVersionSelect(selectId, list) {
+    var sel = $(selectId);
+    if (!sel) return;
+    var items = list || [];
+    if (!items.length) {
+      sel.innerHTML = '<option value="">暂无版本</option>';
+      return;
+    }
+    var rec = pickRecommended(items);
+    sel.innerHTML = items.map(function (v) {
+      return '<option value="' + esc(v.id) + '">' + esc(v.label || v.id) + '</option>';
+    }).join('');
+    if (rec) sel.value = rec.id;
+  }
+
+  function getSelectedEnvVersion(selectId, list) {
+    var sel = $(selectId);
+    var id = sel && sel.value;
+    var items = list || [];
+    for (var i = 0; i < items.length; i++) {
+      if (String(items[i].id) === String(id)) return items[i];
+    }
+    return pickRecommended(items);
+  }
+
+  function setEnvButtons(target, installed) {
+    var installBtn = $('btn-install-' + target);
+    var uninstallBtn = $('btn-uninstall-' + target);
+    if (installBtn) {
+      installBtn.hidden = !!installed;
+      installBtn.disabled = !!envState.busy;
+    }
+    if (uninstallBtn) {
+      uninstallBtn.hidden = !installed;
+      uninstallBtn.disabled = !!envState.busy;
+    }
+  }
+
+  function showEnvProgress(message) {
+    if (!message) return;
+    // 复用部署进度条区域提示环境安装
+    showProgress(true, message, 40);
+  }
+
+  async function refreshEnvInstallState() {
+    if (!DESK || !DESK.detectNode) {
+      setEnvButtons('node', false);
+      setEnvButtons('bit', false);
+      return;
+    }
+    try {
+      var nodeInfo = await DESK.detectNode();
+      envState.nodeInstalled = !!(nodeInfo && nodeInfo.installed);
+      setEnvButtons('node', envState.nodeInstalled);
+      if (envState.nodeInstalled) {
+        var tip = '已安装 Node.js'
+          + (nodeInfo.version ? ' v' + nodeInfo.version : '')
+          + (nodeInfo.path ? '<br><code>' + esc(nodeInfo.path) + '</code>' : '');
+        // 服务探测在 checkNodeService 里补充
+        $('meta-node') && ($('meta-node').dataset.installTip = tip);
+      }
+    } catch (e) {
+      setEnvButtons('node', false);
+    }
+    try {
+      var bitInfo = await DESK.detectBit({ bitApiUrl: getBitUrl() });
+      envState.bitInstalled = !!(bitInfo && bitInfo.installed);
+      setEnvButtons('bit', envState.bitInstalled);
+      if (envState.bitInstalled) {
+        var tip2 = '已安装比特浏览器'
+          + (bitInfo.version ? ' v' + bitInfo.version : '')
+          + (bitInfo.path ? '<br><code>' + esc(bitInfo.path) + '</code>' : '');
+        $('meta-bit') && ($('meta-bit').dataset.installTip = tip2);
+      }
+    } catch (e2) {
+      setEnvButtons('bit', false);
+    }
+  }
+
   async function checkNode() {
-    setStatus('node', 'checking', '正在探测 <code>' + getNodeUrl() + '</code>…');
-    var cmd = DESK && DESK.checkCommands ? await DESK.checkCommands() : { node: null, npm: null };
+    setStatus('node', 'checking', '正在检测 Node.js…');
+    var installTip = '';
+    envState.nodeInstalled = false;
+
+    if (DESK && DESK.detectNode) {
+      try {
+        var info = await DESK.detectNode();
+        envState.nodeInstalled = !!(info && info.installed);
+        setEnvButtons('node', envState.nodeInstalled);
+        if (info && info.installed) {
+          installTip = '已安装 Node.js'
+            + (info.version ? ' v' + info.version : '')
+            + (info.npm ? ' · npm 可用' : ' · 未找到 npm')
+            + (info.path ? '<br><code>' + esc(info.path) + '</code>' : '');
+        } else {
+          installTip = '未检测到 Node.js。已检查 PATH / nvm / 常见安装目录与注册表。';
+        }
+      } catch (e) {
+        setEnvButtons('node', false);
+        installTip = '检测 Node 失败：' + esc((e && e.message) || e);
+      }
+    } else {
+      installTip = '请在 Electron 客户端中检测本机 Node。';
+    }
+
     var r = await probeFetch(getNodeUrl(), { method: 'GET' });
     if (r.ok && r.json && (r.json.success || r.json.data || r.json.name)) {
       var name = (r.json.data && r.json.data.name) || r.json.name || 'TkSwarm';
       var ver = (r.json.data && r.json.data.version) || r.json.version || '';
-      setStatus('node', 'online', '已连接：' + name + (ver ? ' · v' + ver : '') + '<br>健康检查通过');
+      setStatus('node', 'online', (installTip ? installTip + '<br>' : '') + '服务已连接：' + name + (ver ? ' · v' + ver : ''));
       return true;
     }
     if (r.cors) {
-      setStatus('node', 'warn', '端口似乎有响应，但无法读结果。<br>若已启动 Node 服务可视为就绪。');
+      setStatus('node', 'warn', (installTip ? installTip + '<br>' : '') + '端口似乎有响应，但无法读结果。');
       return null;
     }
-    var hint = cmd.node === false
-      ? '本机未检测到 node 命令。请先安装 Node.js。'
-      : '未检测到本机 Node 服务（默认 <code>127.0.0.1:8400</code>）。安装 Node 后请部署并启动代码包。';
-    setStatus('node', 'offline', hint);
+    if (!envState.nodeInstalled) {
+      setStatus('node', 'offline', installTip + '<br>可选择推荐版本后点击「安装」。');
+      return false;
+    }
+    setStatus('node', 'warn',
+      installTip + '<br>服务未启动（默认 <code>127.0.0.1:8400</code>），请部署并启动代码包。');
     return false;
   }
 
   async function checkBit() {
+    setStatus('bit', 'checking', '正在检测比特浏览器…');
+    var installTip = '';
+    envState.bitInstalled = false;
     var base = getBitUrl();
-    setStatus('bit', 'checking', '正在探测 <code>' + base + '/health</code>…');
+
+    if (DESK && DESK.detectBit) {
+      try {
+        var info = await DESK.detectBit({ bitApiUrl: base });
+        envState.bitInstalled = !!(info && info.installed);
+        setEnvButtons('bit', envState.bitInstalled);
+        if (info && info.installed) {
+          installTip = '已安装比特浏览器'
+            + (info.version ? ' v' + info.version : '')
+            + (info.path ? '<br><code>' + esc(info.path) + '</code>' : (info.source === 'api' ? '<br>（通过本地 API 确认已安装）' : ''))
+            + (info.source ? '<br><span class="muted">检测来源：' + esc(info.source) + '</span>' : '');
+        } else {
+          installTip = '未检测到比特浏览器。已检查常见目录、开始菜单、注册表与进程。';
+        }
+      } catch (e) {
+        setEnvButtons('bit', false);
+        installTip = '检测比特失败：' + esc((e && e.message) || e);
+      }
+    }
+
     var r = await probeFetch(base + '/health', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: '{}'
     });
     if (r.ok && r.json && (r.json.success === true || r.json.success === 'true' || r.json.data != null)) {
-      setStatus('bit', 'online', '比特本地 API 在线<br>地址 <code>' + base + '</code>');
+      envState.bitInstalled = true;
+      setEnvButtons('bit', true);
+      setStatus('bit', 'online', (installTip ? installTip + '<br>' : '') + '本地 API 在线 <code>' + esc(base) + '</code>');
       return true;
     }
     if (r.ok) {
-      setStatus('bit', 'online', '比特本地 API 有响应（HTTP ' + r.status + '）<br>地址 <code>' + base + '</code>');
+      envState.bitInstalled = true;
+      setEnvButtons('bit', true);
+      setStatus('bit', 'online', (installTip ? installTip + '<br>' : '') + '本地 API 有响应（HTTP ' + r.status + '）');
       return true;
     }
     if (r.cors) {
-      setStatus('bit', 'warn', '本地端口有响应，但无法确认详情。<br>请确认比特已启动并开启本地 API。');
+      envState.bitInstalled = true;
+      setEnvButtons('bit', true);
+      setStatus('bit', 'warn', (installTip ? installTip + '<br>' : '') + '端口有响应，但无法确认详情。');
       return null;
     }
-    setStatus('bit', 'offline', '未检测到比特浏览器本地 API。<br>请安装并启动比特，API 默认 <code>127.0.0.1:54345</code>');
+    if (!envState.bitInstalled) {
+      setStatus('bit', 'offline', installTip + '<br>可选择版本安装，或「选择安装包安装」。');
+      return false;
+    }
+    setStatus('bit', 'warn',
+      installTip + '<br>请启动比特并开启本地 API <code>' + esc(base) + '</code>');
     return false;
+  }
+
+  async function runEnvAction(kind, action) {
+    if (!DESK || !DESK.isElectron) {
+      toast('请在桌面客户端中操作', 'error');
+      return;
+    }
+    if (envState.busy) {
+      toast('正在执行其他安装任务', 'error');
+      return;
+    }
+    envState.busy = true;
+    setEnvButtons('node', envState.nodeInstalled);
+    setEnvButtons('bit', envState.bitInstalled);
+    var off = DESK.onEnvProgress ? DESK.onEnvProgress(function (p) {
+      showEnvProgress((p && p.message) || '处理中…');
+    }) : null;
+    try {
+      if (kind === 'node' && action === 'install') {
+        var nv = getSelectedEnvVersion('node-ver-select', CFG.nodeVersions);
+        if (!nv) throw new Error('请选择 Node 版本');
+        await DESK.installNode(nv);
+        toast('Node.js 安装流程已完成', 'ok');
+      } else if (kind === 'node' && action === 'uninstall') {
+        await DESK.uninstallNode();
+        toast('Node.js 已卸载', 'ok');
+      } else if (kind === 'bit' && action === 'install') {
+        var bv = getSelectedEnvVersion('bit-ver-select', CFG.bitVersions);
+        await DESK.installBit({ version: bv });
+        toast('比特安装流程已完成', 'ok');
+      } else if (kind === 'bit' && action === 'uninstall') {
+        await DESK.uninstallBit();
+        toast('比特浏览器已卸载', 'ok');
+      } else if (kind === 'bit' && action === 'local') {
+        var file = await DESK.pickInstallerFile();
+        if (!file) return;
+        var bv2 = getSelectedEnvVersion('bit-ver-select', CFG.bitVersions);
+        await DESK.installBit({ version: bv2, localFile: file });
+        toast('已启动本地安装包', 'ok');
+      }
+      // 安装后 PATH 可能尚未刷新，稍等再检
+      await new Promise(function (r) { setTimeout(r, 1200); });
+      await refreshEnvInstallState();
+      await Promise.all([checkNode(), checkBit()]);
+    } catch (err) {
+      toast((err && err.message) || String(err), 'error');
+      await refreshEnvInstallState();
+      await Promise.all([checkNode(), checkBit()]);
+    } finally {
+      if (typeof off === 'function') off();
+      envState.busy = false;
+      showProgress(false);
+      setEnvButtons('node', envState.nodeInstalled);
+      setEnvButtons('bit', envState.bitInstalled);
+    }
   }
 
   async function apiGet(path) {
@@ -228,11 +420,178 @@
     return json.data;
   }
 
+  async function apiPost(path, body) {
+    var url = getApiBase() + '/api' + path;
+    var res = await fetch(url, {
+      method: 'POST',
+      cache: 'no-store',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body || {})
+    });
+    var json = await res.json().catch(function () { return { success: false, message: '响应无效' }; });
+    if (!res.ok || !json.success) throw new Error(json.message || ('请求失败 HTTP ' + res.status));
+    return json.data;
+  }
+
+  var currentPage = 'home';
+  var docsState = { cats: [], catId: 0, docs: [], docId: 0 };
+
+  function showPage(page) {
+    currentPage = page || 'home';
+    ['home', 'docs', 'ticket'].forEach(function (p) {
+      var el = $('page-' + p);
+      if (el) el.hidden = p !== currentPage;
+    });
+    document.querySelectorAll('#app-nav .nav-link').forEach(function (btn) {
+      btn.classList.toggle('active', btn.getAttribute('data-page') === currentPage);
+    });
+    if (currentPage === 'docs') loadDocsPage();
+  }
+
+  function simpleMarkdown(text) {
+    var s = esc(text || '');
+    s = s.replace(/^### (.+)$/gm, '<h3>$1</h3>');
+    s = s.replace(/^## (.+)$/gm, '<h2>$1</h2>');
+    s = s.replace(/^# (.+)$/gm, '<h2>$1</h2>');
+    s = s.replace(/\*\*(.+?)\*\*/g, '<b>$1</b>');
+    s = s.replace(/`([^`]+)`/g, '<code>$1</code>');
+    s = s.replace(/\n/g, '<br>');
+    return s;
+  }
+
+  function renderDocsCats() {
+    var host = $('docs-cats');
+    if (!host) return;
+    var cats = docsState.cats || [];
+    var html = '<button type="button" class="docs-cat-btn' + (!docsState.catId ? ' active' : '') + '" data-cat="0">全部</button>';
+    html += cats.map(function (c) {
+      return '<button type="button" class="docs-cat-btn' + (String(docsState.catId) === String(c.id) ? ' active' : '') + '" data-cat="' + c.id + '">' + esc(c.name) + '</button>';
+    }).join('');
+    host.innerHTML = html || '<div class="muted docs-loading">暂无分类</div>';
+    host.querySelectorAll('.docs-cat-btn').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        docsState.catId = Number(btn.getAttribute('data-cat') || 0);
+        docsState.docId = 0;
+        renderDocsCats();
+        loadDocsList();
+      });
+    });
+  }
+
+  function renderDocsList() {
+    var host = $('docs-main');
+    if (!host) return;
+    var docs = docsState.docs || [];
+    if (!docs.length) {
+      host.innerHTML = '<div class="muted docs-loading">该分类下暂无文档</div>';
+      return;
+    }
+    host.innerHTML = docs.map(function (d) {
+      return '<button type="button" class="docs-list-item" data-doc="' + d.id + '">'
+        + '<div class="docs-list-title">' + esc(d.title) + '</div>'
+        + '<p class="docs-list-summary">' + esc(d.summary || '点击查看详情') + '</p>'
+        + '</button>';
+    }).join('');
+    host.querySelectorAll('.docs-list-item').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        openDocDetail(Number(btn.getAttribute('data-doc')));
+      });
+    });
+  }
+
+  async function openDocDetail(id) {
+    var host = $('docs-main');
+    if (!host || !id) return;
+    host.innerHTML = '<div class="muted docs-loading">加载中…</div>';
+    try {
+      var d = await apiGet('/help/docs/' + id);
+      docsState.docId = id;
+      host.innerHTML =
+        '<button type="button" class="docs-detail-back" id="docs-back">← 返回列表</button>'
+        + '<h1 class="docs-detail-title">' + esc(d.title) + '</h1>'
+        + '<div class="docs-detail-meta">'
+        + (d.category && d.category.name ? esc(d.category.name) + ' · ' : '')
+        + '阅读 ' + (d.viewCount || 0)
+        + (d.updatedAt ? ' · 更新 ' + esc(d.updatedAt) : '')
+        + '</div>'
+        + '<div class="docs-detail-body">' + simpleMarkdown(d.content || d.summary || '') + '</div>';
+      var back = $('docs-back');
+      if (back) back.addEventListener('click', function () {
+        docsState.docId = 0;
+        renderDocsList();
+      });
+    } catch (err) {
+      host.innerHTML = '<div class="muted docs-loading">加载失败：' + esc((err && err.message) || err) + '</div>';
+    }
+  }
+
+  async function loadDocsList() {
+    var host = $('docs-main');
+    if (host) host.innerHTML = '<div class="muted docs-loading">加载中…</div>';
+    try {
+      var q = docsState.catId ? ('?category_id=' + encodeURIComponent(docsState.catId)) : '';
+      var data = await apiGet('/help/docs' + q);
+      docsState.docs = (data && data.items) || [];
+      renderDocsList();
+    } catch (err) {
+      if (host) host.innerHTML = '<div class="muted docs-loading">加载失败：' + esc((err && err.message) || err) + '</div>';
+    }
+  }
+
+  async function loadDocsPage() {
+    var catsHost = $('docs-cats');
+    if (catsHost) catsHost.innerHTML = '<div class="muted docs-loading">加载中…</div>';
+    try {
+      var data = await apiGet('/help/categories');
+      docsState.cats = (data && data.items) || [];
+      renderDocsCats();
+      await loadDocsList();
+    } catch (err) {
+      if (catsHost) catsHost.innerHTML = '<div class="muted docs-loading">加载失败：' + esc((err && err.message) || err) + '</div>';
+      var main = $('docs-main');
+      if (main) main.innerHTML = '<div class="muted docs-loading">请检查服务器 API 地址与网络</div>';
+    }
+  }
+
+  async function submitTicket(e) {
+    e.preventDefault();
+    var subject = ($('ticket-subject') && $('ticket-subject').value || '').trim();
+    var content = ($('ticket-content') && $('ticket-content').value || '').trim();
+    if (!subject || !content) {
+      toast('请填写主题与问题描述', 'error');
+      return;
+    }
+    var btn = $('btn-ticket-submit');
+    if (btn) btn.disabled = true;
+    try {
+      var result = await apiPost('/tickets', {
+        subject: subject,
+        content: content,
+        contactName: ($('ticket-name') && $('ticket-name').value || '').trim(),
+        contactPhone: ($('ticket-phone') && $('ticket-phone').value || '').trim(),
+        contactEmail: ($('ticket-email') && $('ticket-email').value || '').trim(),
+        priority: ($('ticket-priority') && $('ticket-priority').value) || 'normal',
+        clientPlatform: APP.platform || '',
+        clientVersion: APP.version || ''
+      });
+      toast((result && result.message) || '提交成功', 'ok');
+      var hint = $('ticket-hint');
+      if (hint) hint.textContent = result && result.ticketNo ? ('工单号：' + result.ticketNo) : '';
+      if ($('ticket-form')) $('ticket-form').reset();
+    } catch (err) {
+      toast((err && err.message) || String(err), 'error');
+    } finally {
+      if (btn) btn.disabled = false;
+    }
+  }
+
   function downloadUrl(relOrAbs) {
     if (!relOrAbs) return '';
     if (/^https?:\/\//i.test(relOrAbs)) return relOrAbs;
     return getApiBase() + relOrAbs;
   }
+
+  var catalogById = {};
 
   function renderLatest(item) {
     var main = $('latest-main');
@@ -254,29 +613,37 @@
     }
   }
 
-  function renderCatalog(items) {
-    var tbody = $('version-tbody');
-    if (!tbody) return;
+  function getSelectedVersionItem() {
+    var sel = $('version-select');
+    if (!sel || !sel.value) return null;
+    return catalogById[sel.value] || null;
+  }
+
+  function fillVersionSelect(items, preferredId) {
+    var sel = $('version-select');
+    catalogById = {};
+    if (!sel) return;
     if (!items || !items.length) {
-      tbody.innerHTML = '<tr><td colspan="5" class="empty-cell">暂无已发布版本</td></tr>';
+      sel.innerHTML = '<option value=\"\">暂无已发布版本</option>';
+      renderLatest(null);
       return;
     }
-    tbody.innerHTML = items.map(function (v) {
-      var latest = v.isLatest ? '<span class="badge-latest">最新</span>' : '';
-      var url = downloadUrl(v.downloadUrl);
-      return (
-        '<tr>' +
-          '<td><b>v' + esc(v.version) + '</b>' + latest + '</td>' +
-          '<td>' + esc(v.title || '-') + '</td>' +
-          '<td>' + formatBytes(v.fileSize || 0) + '</td>' +
-          '<td>' + (v.downloadCount || 0) + '</td>' +
-          '<td class="acts">' +
-            '<button type="button" class="btn soft tiny" data-deploy="' + esc(url) + '" data-ver="' + esc(v.version) + '">部署</button> ' +
-            '<button type="button" class="btn ghost tiny" data-dl="' + esc(url) + '">下载</button>' +
-          '</td>' +
-        '</tr>'
-      );
+    var latestId = '';
+    sel.innerHTML = items.map(function (v) {
+      var id = String(v.id != null ? v.id : v.version);
+      catalogById[id] = v;
+      if (v.isLatest && !latestId) latestId = id;
+      var label = 'v' + v.version
+        + (v.title ? ' · ' + v.title : '')
+        + (v.isLatest ? '（最新）' : '')
+        + (v.fileSize ? ' · ' + formatBytes(v.fileSize) : '');
+      return '<option value=\"' + esc(id) + '\">' + esc(label) + '</option>';
     }).join('');
+    var pick = preferredId && catalogById[preferredId]
+      ? preferredId
+      : (latestId || String(items[0].id != null ? items[0].id : items[0].version));
+    sel.value = pick;
+    renderLatest(catalogById[pick] || items[0]);
   }
 
   async function loadVersions() {
@@ -284,28 +651,109 @@
     var chSel = $('channel-select');
     if (chSel) chSel.value = channel;
     updatePills();
+    var verSel = $('version-select');
+    if (verSel) verSel.innerHTML = '<option value=\"\">加载版本…</option>';
     try {
-      var latest = null;
-      try {
-        latest = await apiGet('/client-versions/latest?channel=' + encodeURIComponent(channel));
-      } catch (e) {
-        latest = null;
-      }
-      renderLatest(latest);
       var catalog = await apiGet('/client-versions/catalog?channel=' + encodeURIComponent(channel));
       var items = (catalog && catalog.items) || (Array.isArray(catalog) ? catalog : []);
-      renderCatalog(items);
+      var preferred = null;
+      try {
+        var latest = await apiGet('/client-versions/latest?channel=' + encodeURIComponent(channel));
+        if (latest && latest.id != null) preferred = String(latest.id);
+      } catch (e) { /* ignore */ }
+      fillVersionSelect(items, preferred);
     } catch (err) {
-      renderLatest(null);
-      var tbody = $('version-tbody');
-      if (tbody) {
-        tbody.innerHTML = '<tr><td colspan="5" class="empty-cell">加载失败：' + esc(err.message) + '<br>请在「服务器」中检查 API 地址</td></tr>';
-      }
+      fillVersionSelect([]);
       toast(err.message || '加载版本失败', 'error');
     }
   }
 
-  async function deployByUrl(url, version) {
+  async function ensureEnvReadyForDeploy() {
+    if (DESK && DESK.detectNode && DESK.detectBit) {
+      try {
+        var nodeInfo = await DESK.detectNode();
+        envState.nodeInstalled = !!(nodeInfo && nodeInfo.installed);
+      } catch (e) {
+        envState.nodeInstalled = false;
+      }
+      try {
+        var bitInfo = await DESK.detectBit({ bitApiUrl: getBitUrl() });
+        envState.bitInstalled = !!(bitInfo && bitInfo.installed);
+      } catch (e2) {
+        envState.bitInstalled = false;
+      }
+      setEnvButtons('node', envState.nodeInstalled);
+      setEnvButtons('bit', envState.bitInstalled);
+    }
+    var missing = [];
+    if (!envState.nodeInstalled) missing.push('Node.js');
+    if (!envState.bitInstalled) missing.push('比特浏览器');
+    if (missing.length) {
+      toast('请先安装好环境再部署：' + missing.join('、'), 'error');
+      return false;
+    }
+    return true;
+  }
+
+  async function deploySelected() {
+    if (!(await ensureEnvReadyForDeploy())) return;
+    var item = getSelectedVersionItem();
+    if (!item || !item.downloadUrl) {
+      toast('请先选择要部署的版本号', 'error');
+      return;
+    }
+    var dir = getDeployDir();
+    if (!dir) {
+      toast('请先选择部署目录', 'error');
+      return;
+    }
+    setDeployDir(dir);
+
+    if (DESK && DESK.inspectDeployDir) {
+      var info = await DESK.inspectDeployDir(dir);
+      if (info && info.deployed) {
+        var confirmed = await DESK.showConfirm({
+          title: '已部署过程序',
+          message: '当前目录已部署过代码，是否确认删除原程序？',
+          detail: '将清空部署目录中的业务代码（node_modules、源码等）。\n不会删除本安装助手的 EXE / Mac 应用。\n删除成功后，请再次点击「一键部署」安装所选版本。',
+          buttons: ['取消', '确认删除'],
+          confirmIndex: 1,
+          cancelId: 0,
+          defaultId: 1
+        });
+        if (!confirmed) return;
+        try {
+          showProgress(true, '正在删除原程序…', 30);
+          await DESK.clearDeployDir(dir);
+          showProgress(false);
+          toast('原程序已删除成功，请再次点击「一键部署」安装所选版本', 'ok');
+        } catch (err) {
+          showProgress(false);
+          toast((err && err.message) || String(err), 'error');
+        }
+        return;
+      }
+    }
+
+    // 目录干净：按所选版本下载 → npm install → 启动
+    await deployByUrl(downloadUrl(item.downloadUrl), item.version, {
+      npmInstall: true,
+      startAfter: true
+    });
+  }
+
+  async function downloadSelectedBrowser() {
+    var item = getSelectedVersionItem();
+    if (!item || !item.downloadUrl) {
+      toast('请先选择版本', 'error');
+      return;
+    }
+    openExternal(downloadUrl(item.downloadUrl));
+    toast('已在浏览器开始下载 v' + item.version, 'ok');
+  }
+
+  async function deployByUrl(url, version, opts) {
+    opts = opts || {};
     if (!DESK || typeof DESK.deployPackage !== 'function') {
       openExternal(url);
       toast('当前非 Electron 环境，已改为浏览器下载', 'warn');
@@ -322,18 +770,20 @@
     }
     setDeployDir(dir);
     busy = true;
-    showProgress(true, '开始部署…', 5);
+    showProgress(true, '开始部署所选版本…', 5);
     var off = DESK.onDeployProgress ? DESK.onDeployProgress(function (p) {
       showProgress(true, (p && p.message) || '处理中…', (p && p.percent) || 0);
     }) : null;
     try {
+      var doNpm = opts.npmInstall != null ? !!opts.npmInstall : true;
+      var doStart = opts.startAfter != null ? !!opts.startAfter : true;
       var result = await DESK.deployPackage({
         url: url,
         version: version || 'latest',
         deployDir: dir,
         apiBase: getApiBase(),
-        npmInstall: !!($('chk-npm') && $('chk-npm').checked),
-        startAfter: !!($('chk-start') && $('chk-start').checked)
+        npmInstall: doNpm,
+        startAfter: doStart
       });
       toast('部署完成：' + (result && result.deployDir ? result.deployDir : dir), 'ok');
       await checkNode();
@@ -343,27 +793,6 @@
       if (typeof off === 'function') off();
       busy = false;
       showProgress(false);
-    }
-  }
-
-  async function deployLatest() {
-    try {
-      var item = await apiGet('/client-versions/latest?channel=' + encodeURIComponent(getChannel()));
-      if (!item || !item.downloadUrl) throw new Error('暂无最新版本');
-      await deployByUrl(downloadUrl(item.downloadUrl), item.version);
-    } catch (err) {
-      toast(err.message || '部署失败', 'error');
-    }
-  }
-
-  async function downloadLatestBrowser() {
-    try {
-      var item = await apiGet('/client-versions/latest?channel=' + encodeURIComponent(getChannel()));
-      if (!item || !item.downloadUrl) throw new Error('暂无最新版本');
-      openExternal(downloadUrl(item.downloadUrl));
-      toast('已在浏览器开始下载 v' + item.version, 'ok');
-    } catch (err) {
-      toast(err.message || '下载失败', 'error');
     }
   }
 
@@ -383,13 +812,14 @@
     $('settings-modal').hidden = true;
   }
 
-  function nodeInstallUrl() {
-    var d = CFG.downloads || {};
-    if (APP.platform === 'darwin') return d.nodeMac || d.node;
-    return d.nodeMsi || d.node;
-  }
-
   function bind() {
+    document.querySelectorAll('#app-nav .nav-link').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        showPage(btn.getAttribute('data-page') || 'home');
+      });
+    });
+    $('ticket-form') && $('ticket-form').addEventListener('submit', submitTicket);
+
     $('btn-recheck') && $('btn-recheck').addEventListener('click', function () { recheckAll(); });
     $('btn-settings') && $('btn-settings').addEventListener('click', openSettings);
     $('btn-close-settings') && $('btn-close-settings').addEventListener('click', closeSettings);
@@ -413,29 +843,30 @@
       toast('设置已保存', 'ok');
       recheckAll();
       loadVersions();
+      if (currentPage === 'docs') loadDocsPage();
     });
 
     $('btn-install-node') && $('btn-install-node').addEventListener('click', function () {
-      openExternal(nodeInstallUrl());
+      runEnvAction('node', 'install');
+    });
+    $('btn-uninstall-node') && $('btn-uninstall-node').addEventListener('click', function () {
+      runEnvAction('node', 'uninstall');
     });
     $('btn-open-node-site') && $('btn-open-node-site').addEventListener('click', function () {
       openExternal((CFG.downloads && CFG.downloads.node) || 'https://nodejs.org/');
     });
     $('btn-install-bit') && $('btn-install-bit').addEventListener('click', function () {
-      openExternal((CFG.downloads && CFG.downloads.bitDownload) || (CFG.downloads && CFG.downloads.bit));
+      runEnvAction('bit', 'install');
+    });
+    $('btn-uninstall-bit') && $('btn-uninstall-bit').addEventListener('click', function () {
+      runEnvAction('bit', 'uninstall');
     });
     $('btn-open-bit-site') && $('btn-open-bit-site').addEventListener('click', function () {
       openExternal((CFG.downloads && CFG.downloads.bit) || 'https://www.bitbrowser.cn/');
     });
-    $('btn-bit-local') && $('btn-bit-local').addEventListener('click', async function () {
-      if (!DESK || !DESK.pickAndRunInstaller) {
-        toast('请在 Electron 客户端中使用', 'error');
-        return;
-      }
-      var file = await DESK.pickAndRunInstaller();
-      if (file) toast('已打开安装包', 'ok');
+    $('btn-bit-local') && $('btn-bit-local').addEventListener('click', function () {
+      runEnvAction('bit', 'local');
     });
-
     $('btn-browse-dir') && $('btn-browse-dir').addEventListener('click', async function () {
       if (!DESK || !DESK.pickDirectory) {
         toast('请在 Electron 客户端中选择目录', 'error');
@@ -447,24 +878,14 @@
         toast('已选择部署目录', 'ok');
       }
     });
-    $('btn-open-dir') && $('btn-open-dir').addEventListener('click', async function () {
-      var dir = getDeployDir();
-      if (!dir) {
-        toast('请先选择部署目录', 'error');
-        return;
-      }
-      setDeployDir(dir);
-      if (DESK && DESK.openPath) await DESK.openPath(dir);
-      else toast(dir, 'ok');
-    });
     $('deploy-dir-input') && $('deploy-dir-input').addEventListener('change', function () {
       setDeployDir(getDeployDir());
     });
 
     $('btn-refresh-versions') && $('btn-refresh-versions').addEventListener('click', function () { loadVersions(); });
-    $('btn-deploy-latest') && $('btn-deploy-latest').addEventListener('click', function () { deployLatest(); });
-    $('btn-download-only') && $('btn-download-only').addEventListener('click', function () { downloadLatestBrowser(); });
+    $('btn-deploy-latest') && $('btn-deploy-latest').addEventListener('click', function () { deploySelected(); });
     $('btn-start-only') && $('btn-start-only').addEventListener('click', async function () {
+      if (!(await ensureEnvReadyForDeploy())) return;
       var dir = getDeployDir();
       if (!dir) {
         toast('请先选择部署目录', 'error');
@@ -486,18 +907,8 @@
       localStorage.setItem(LS.channel, e.target.value || 'stable');
       loadVersions();
     });
-
-    $('version-tbody') && $('version-tbody').addEventListener('click', function (e) {
-      var deployBtn = e.target.closest('[data-deploy]');
-      if (deployBtn) {
-        deployByUrl(deployBtn.getAttribute('data-deploy'), deployBtn.getAttribute('data-ver'));
-        return;
-      }
-      var dlBtn = e.target.closest('[data-dl]');
-      if (dlBtn) {
-        openExternal(dlBtn.getAttribute('data-dl'));
-        toast('已开始下载', 'ok');
-      }
+    $('version-select') && $('version-select').addEventListener('change', function () {
+      renderLatest(getSelectedVersionItem());
     });
   }
 
@@ -517,12 +928,10 @@
     if ($('deploy-dir-input') && savedDir) $('deploy-dir-input').value = savedDir;
 
     var foot = $('footer-ver');
-    if (foot) foot.textContent = (CFG.appName || 'TKSwarm Client') + ' v' + APP.version;
+    if (foot) foot.textContent = (CFG.appName || 'Dyy TKSwarm Client') + ' v' + APP.version;
 
-    var nodeBtn = $('btn-install-node');
-    if (nodeBtn) {
-      nodeBtn.textContent = APP.platform === 'darwin' ? '下载 Node (macOS)' : '下载 Node (Windows)';
-    }
+    fillEnvVersionSelect('node-ver-select', CFG.nodeVersions);
+    fillEnvVersionSelect('bit-ver-select', CFG.bitVersions);
 
     bind();
     updatePills();

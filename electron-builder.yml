@@ -1,9 +1,18 @@
 appId: com.tkswarm.client
-productName: TKSwarm Client
+productName: Dyy TkSwarm Client
 copyright: Copyright © TKSwarm
 directories:
   output: dist
   buildResources: build
+
+# 打包体积优化（功能不变）：
+# - maximum：安装包/便携包用更强压缩（构建稍慢）
+# - electronLanguages：只保留中英语言包，去掉 Chromium 其它几十种 locale（通常可省数 MB～十余 MB）
+compression: maximum
+electronLanguages:
+  - en-US
+  - zh-CN
+
 files:
   - main.js
   - preload.js
@@ -12,6 +21,11 @@ files:
   - app.js
   - config.js
   - package.json
+  - lib/**/*
+  # icon 只放 buildResources，勿打进 asar
+  - "!**/*.md"
+  - "!**/.git*"
+  - "!**/node_modules/**"
 asar: true
 # 将 homepage / repository.owner 改成真实 GitHub 后，打 tag 可自动发 Release
 publish:
@@ -33,9 +47,11 @@ nsis:
   allowToChangeInstallationDirectory: true
   createDesktopShortcut: true
   createStartMenuShortcut: true
-  shortcutName: TKSwarm Client
+  shortcutName: Dyy TkSwarm Client
   installerLanguages: [zh_CN, en_US]
   language: "2052"
+  # 差分更新块图可略增构建产物体积；单文件下载场景可关掉
+  differentialPackage: false
 
 portable:
   artifactName: ${productName}-${version}-win-portable.${ext}

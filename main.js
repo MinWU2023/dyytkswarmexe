@@ -6,8 +6,9 @@ const fs = require('fs');
 const os = require('os');
 const https = require('https');
 const http = require('http');
-const { spawn, execFile } = require('child_process');
+const { spawn } = require('child_process');
 const { createWriteStream } = require('fs');
+const envInstall = require('./lib/env-install');
 
 /** @type {BrowserWindow | null} */
 let mainWindow = null;
@@ -19,6 +20,12 @@ function isHttpUrl(url) {
 function sendProgress(payload) {
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.webContents.send('deploy-progress', payload);
+  }
+}
+
+function sendEnvProgress(payload) {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('env-progress', payload);
   }
 }
 
@@ -43,12 +50,11 @@ function runCmd(command, args, opts = {}) {
 }
 
 function commandExists(name) {
-  const cmd = process.platform === 'win32' ? 'where' : 'which';
-  return new Promise((resolve) => {
-    execFile(cmd, [name], { windowsHide: true }, (err) => {
-      resolve(!err);
-    });
-  });
+  return envInstall.resolveNodeTools().then((tools) => {
+    if (name === 'node') return !!(tools && tools.ok && tools.node);
+    if (name === 'npm') return !!(tools && tools.ok && tools.npm);
+    return false;
+  }).catch(() => false);
 }
 
 function defaultDeployDir() {
@@ -166,47 +172,164 @@ function ensureDotEnv(dir, apiBase) {
   fs.writeFileSync(envPath, body, 'utf8');
 }
 
+function writeDeployMarker(dir, version) {
+  try {
+    fs.writeFileSync(
+      path.join(dir, '.tkswarm-deployed'),
+      JSON.stringify({ version: version || '', at: new Date().toISOString() }, null, 2),
+      'utf8'
+    );
+  } catch (_) {}
+}
+
+/** 防止误删本安装助手 EXE / Mac .app */
+function assertSafeToClearDeployDir(dir) {
+  if (!dir || typeof dir !== 'string') throw new Error('部署目录无效');
+  const resolved = path.resolve(dir);
+  if (!fs.existsSync(resolved)) {
+    return { ok: true, resolved };
+  }
+  const st = fs.statSync(resolved);
+  if (!st.isDirectory()) throw new Error('部署路径不是文件夹');
+
+  const execPath = path.resolve(process.execPath);
+  const execDir = path.dirname(execPath);
+  const appPath = path.resolve(app.getAppPath());
+
+  const norm = (p) => path.resolve(p).toLowerCase();
+  const r = norm(resolved);
+  const eDir = norm(execDir);
+  const aPath = norm(appPath);
+
+  // 不能是助手可执行文件所在目录，也不能是其父目录去删整个安装树
+  if (app.isPackaged) {
+    if (r === eDir || eDir.startsWith(r + path.sep.toLowerCase()) || eDir.startsWith(r + '\\') || eDir.startsWith(r + '/')) {
+      throw new Error('不能删除安装助手所在目录，请更换部署目录');
+    }
+    if (r === aPath || aPath.startsWith(r + path.sep.toLowerCase())) {
+      throw new Error('不能删除安装助手应用目录，请更换部署目录');
+    }
+  }
+
+  // 目录内若直接是本助手 exe / .app，拒绝
+  const dangerousNames = [
+    'Dyy TKSwarm Client.exe',
+    'TKSwarm Client.exe',
+    'Dyy TKSwarm Client.app',
+    'TKSwarm Client.app',
+    'electron.exe'
+  ];
+  for (const name of dangerousNames) {
+    if (fs.existsSync(path.join(resolved, name))) {
+      throw new Error('该目录包含桌面客户端程序，已拒绝删除以免误删安装助手');
+    }
+  }
+
+  // 拒绝系统关键路径
+  const home = path.resolve(os.homedir()).toLowerCase();
+  if (r === home || r === 'c:\\' || r === 'c:' || r === '/' || r === '/users' || r === '/home') {
+    throw new Error('部署目录过于靠近系统目录，已拒绝清空');
+  }
+
+  return { ok: true, resolved };
+}
+
+function inspectDeployDir(dir) {
+  if (!dir || !fs.existsSync(dir)) {
+    return { deployed: false, path: dir || '', markers: [] };
+  }
+  const markers = [];
+  const checks = [
+    ['package.json', 'package.json'],
+    ['start.bat', 'start.bat'],
+    ['start.sh', 'start.sh'],
+    ['.tkswarm-deployed', '.tkswarm-deployed'],
+    ['src/server.js', path.join('src', 'server.js')],
+    ['node_modules', 'node_modules']
+  ];
+  for (const [label, rel] of checks) {
+    if (fs.existsSync(path.join(dir, rel))) markers.push(label);
+  }
+  const deployed = markers.includes('package.json')
+    || markers.includes('.tkswarm-deployed')
+    || markers.includes('start.bat')
+    || markers.includes('start.sh');
+  return { deployed, path: path.resolve(dir), markers };
+}
+
+function clearDeployDir(dir) {
+  const { resolved } = assertSafeToClearDeployDir(dir);
+  if (!fs.existsSync(resolved)) {
+    return { ok: true, cleared: false, path: resolved };
+  }
+  // 只清空目录内容，不删除部署目录本身；不触碰助手安装路径
+  const entries = fs.readdirSync(resolved);
+  for (const name of entries) {
+    // 双保险：绝不删除这些文件名
+    if (/^(Dyy\s+)?TKSwarm Client\.(exe|app)$/i.test(name) || /^electron\.exe$/i.test(name)) {
+      continue;
+    }
+    fs.rmSync(path.join(resolved, name), { recursive: true, force: true });
+  }
+  return { ok: true, cleared: true, path: resolved };
+}
+
 async function npmInstall(dir) {
-  const npmCmd = process.platform === 'win32' ? 'npm.cmd' : 'npm';
-  await runCmd(npmCmd, ['install'], { cwd: dir, shell: process.platform === 'win32' });
+  const tools = await envInstall.resolveNodeTools();
+  if (!tools.ok || !tools.npm) {
+    throw new Error('未找到 npm。请确认已安装 Node.js（含 npm），或安装后重启本客户端再试');
+  }
+  const npmCmd = tools.npm;
+  // Windows 上 npm.cmd 需 shell；传入补全后的 PATH，避免子进程找不到 node
+  await runCmd(npmCmd, ['install'], {
+    cwd: dir,
+    shell: process.platform === 'win32',
+    env: tools.env
+  });
 }
 
 async function startService(dir) {
+  const tools = await envInstall.resolveNodeTools();
   const bat = path.join(dir, 'start.bat');
   const sh = path.join(dir, 'start.sh');
+  const enrichedEnv = Object.assign({}, process.env, (tools && tools.env) || {});
   if (process.platform === 'win32' && fs.existsSync(bat)) {
     spawn('cmd.exe', ['/c', 'start', '""', bat], {
       cwd: dir,
       detached: true,
       stdio: 'ignore',
-      windowsHide: true
+      windowsHide: true,
+      env: enrichedEnv
     }).unref();
     return { method: 'start.bat' };
   }
   if (fs.existsSync(sh)) {
-    spawn('bash', [sh], { cwd: dir, detached: true, stdio: 'ignore' }).unref();
+    spawn('bash', [sh], { cwd: dir, detached: true, stdio: 'ignore', env: enrichedEnv }).unref();
     return { method: 'start.sh' };
   }
-  const npmCmd = process.platform === 'win32' ? 'npm.cmd' : 'npm';
+  const npmCmd = (tools && tools.npm)
+    || (process.platform === 'win32' ? 'npm.cmd' : 'npm');
   spawn(npmCmd, ['start'], {
     cwd: dir,
     detached: true,
     stdio: 'ignore',
-    shell: process.platform === 'win32'
+    shell: process.platform === 'win32',
+    env: enrichedEnv
   }).unref();
   return { method: 'npm start' };
 }
 
 function createWindow() {
   mainWindow = new BrowserWindow({
-    width: 1180,
-    height: 800,
+    width: 1120,
+    height: 780,
     minWidth: 900,
     minHeight: 640,
     show: false,
     backgroundColor: '#e8f4ff',
     autoHideMenuBar: true,
-    title: 'TKSwarm Client',
+    title: 'Dyy TkSwarm Client',
+    icon: path.join(__dirname, 'build', 'icon.png'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -290,6 +413,31 @@ function registerIpc() {
       || fs.existsSync(path.join(dir, 'package.json'));
   });
 
+  ipcMain.handle('inspect-deploy-dir', async (_e, dir) => {
+    return inspectDeployDir(dir);
+  });
+
+  ipcMain.handle('clear-deploy-dir', async (_e, dir) => {
+    return clearDeployDir(dir);
+  });
+
+  ipcMain.handle('show-confirm', async (_e, options) => {
+    const opts = options || {};
+    const result = await dialog.showMessageBox(mainWindow, {
+      type: opts.type || 'question',
+      title: opts.title || '确认',
+      message: opts.message || '是否确认？',
+      detail: opts.detail || '',
+      buttons: opts.buttons || ['取消', '确认'],
+      defaultId: opts.defaultId != null ? opts.defaultId : 1,
+      cancelId: opts.cancelId != null ? opts.cancelId : 0,
+      noLink: true
+    });
+    // 约定：最后一个按钮为确认（index = buttons.length - 1），或 response === confirmIndex
+    const confirmIndex = opts.confirmIndex != null ? opts.confirmIndex : ((opts.buttons || ['取消', '确认']).length - 1);
+    return result.response === confirmIndex;
+  });
+
   ipcMain.handle('pick-and-run-installer', async () => {
     const result = await dialog.showOpenDialog(mainWindow, {
       title: '选择比特浏览器安装包',
@@ -330,10 +478,13 @@ function registerIpc() {
     sendProgress({ stage: 'extract', percent: 0, message: '正在解压…' });
     await extractZip(zipPath, deployDir);
     ensureDotEnv(deployDir, apiBase);
+    writeDeployMarker(deployDir, version);
 
     if (doNpm) {
-      const hasNpm = await commandExists('npm');
-      if (!hasNpm) throw new Error('未找到 npm，请先安装 Node.js 并重新打开本客户端');
+      const tools = await envInstall.resolveNodeTools();
+      if (!tools.ok || !tools.npm) {
+        throw new Error('未找到 npm，请先安装 Node.js（PATH/nvm 需可被检测到）后重新打开本客户端');
+      }
       sendProgress({ stage: 'npm', percent: 0, message: '正在 npm install（可能需几分钟）…' });
       await npmInstall(deployDir);
     }
@@ -356,6 +507,54 @@ function registerIpc() {
   ipcMain.handle('start-service', async (_e, dir) => {
     if (!dir || !fs.existsSync(dir)) throw new Error('部署目录不存在');
     return startService(dir);
+  });
+
+  ipcMain.handle('detect-node', async () => envInstall.detectNode());
+  ipcMain.handle('detect-bit', async (_e, options) => envInstall.detectBit(options || {}));
+  ipcMain.handle('resolve-node-tools', async () => {
+    const tools = await envInstall.resolveNodeTools();
+    return {
+      ok: tools.ok,
+      node: tools.node,
+      npm: tools.npm,
+      info: tools.info
+    };
+  });
+
+  ipcMain.handle('install-node', async (_e, versionMeta) => {
+    const cacheDir = path.join(app.getPath('temp'), 'TkSwarm-Client', 'installers');
+    return envInstall.installNode(versionMeta, cacheDir, (p) => sendEnvProgress(Object.assign({ target: 'node' }, p)));
+  });
+
+  ipcMain.handle('uninstall-node', async () => {
+    return envInstall.uninstallNode((p) => sendEnvProgress(Object.assign({ target: 'node' }, p)));
+  });
+
+  ipcMain.handle('install-bit', async (_e, payload) => {
+    const cacheDir = path.join(app.getPath('temp'), 'TkSwarm-Client', 'installers');
+    const versionMeta = (payload && payload.version) || payload || {};
+    return envInstall.installBit(versionMeta, {
+      cacheDir,
+      localFile: payload && payload.localFile,
+      waitMs: (payload && payload.waitMs) || 180000
+    }, (p) => sendEnvProgress(Object.assign({ target: 'bit' }, p)));
+  });
+
+  ipcMain.handle('uninstall-bit', async () => {
+    return envInstall.uninstallBit((p) => sendEnvProgress(Object.assign({ target: 'bit' }, p)));
+  });
+
+  ipcMain.handle('pick-installer-file', async () => {
+    const result = await dialog.showOpenDialog(mainWindow, {
+      title: '选择安装包',
+      filters: [
+        { name: '安装包', extensions: ['exe', 'msi', 'dmg', 'pkg', 'zip'] },
+        { name: '全部', extensions: ['*'] }
+      ],
+      properties: ['openFile']
+    });
+    if (result.canceled || !result.filePaths.length) return null;
+    return result.filePaths[0];
   });
 }
 
