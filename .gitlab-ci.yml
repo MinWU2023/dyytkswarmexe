@@ -1,0 +1,64 @@
+# 本仓库独立使用时的 GitLab CI（Windows + macOS Runner）
+stages:
+  - build
+
+variables:
+  npm_config_cache: "$CI_PROJECT_DIR/.npm"
+  ELECTRON_CACHE: "$CI_PROJECT_DIR/.cache/electron"
+  ELECTRON_BUILDER_CACHE: "$CI_PROJECT_DIR/.cache/electron-builder"
+
+.cache_npm: &cache_npm
+  cache:
+    key:
+      files:
+        - package-lock.json
+    paths:
+      - .npm/
+      - .cache/
+      - node_modules/
+
+.build_rules: &build_rules
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^client-v/
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_PIPELINE_SOURCE == "web"
+    - if: $CI_COMMIT_BRANCH
+
+build:windows:
+  stage: build
+  tags:
+    - saas-windows-medium-amd64
+  <<: *cache_npm
+  <<: *build_rules
+  before_script:
+    - node -v
+    - npm ci
+  script:
+    - npm run dist:ci
+  artifacts:
+    name: "tkswarm-client-win-$CI_COMMIT_SHORT_SHA"
+    paths:
+      - dist/*.exe
+      - dist/*.yml
+      - dist/*.blockmap
+    expire_in: 14 days
+
+build:macos:
+  stage: build
+  tags:
+    - saas-macos-medium-m1
+  <<: *cache_npm
+  <<: *build_rules
+  before_script:
+    - node -v
+    - npm ci
+  script:
+    - npm run dist:ci
+  artifacts:
+    name: "tkswarm-client-mac-$CI_COMMIT_SHORT_SHA"
+    paths:
+      - dist/*.dmg
+      - dist/*.zip
+      - dist/*.yml
+      - dist/*.blockmap
+    expire_in: 14 days
