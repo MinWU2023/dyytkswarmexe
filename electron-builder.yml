@@ -1,0 +1,65 @@
+appId: com.tkswarm.client
+productName: TKSwarm Client
+copyright: Copyright © TKSwarm
+directories:
+  output: dist
+  buildResources: build
+files:
+  - main.js
+  - preload.js
+  - index.html
+  - styles.css
+  - app.js
+  - config.js
+  - package.json
+asar: true
+# 将 homepage / repository.owner 改成真实 GitHub 后，打 tag 可自动发 Release
+publish:
+  - provider: github
+    releaseType: release
+
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+    - target: portable
+      arch: [x64]
+  artifactName: ${productName}-${version}-win-${arch}.${ext}
+  # 可选签名：在 CI 配置 CSC_LINK / CSC_KEY_PASSWORD
+
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: TKSwarm Client
+  installerLanguages: [zh_CN, en_US]
+  language: "2052"
+
+portable:
+  artifactName: ${productName}-${version}-win-portable.${ext}
+
+mac:
+  target:
+    - target: dmg
+      arch: [x64, arm64]
+    - target: zip
+      arch: [x64, arm64]
+  category: public.app-category.business
+  artifactName: ${productName}-${version}-mac-${arch}.${ext}
+  hardenedRuntime: true
+  gatekeeperAssess: false
+  entitlements: build/entitlements.mac.plist
+  entitlementsInherit: build/entitlements.mac.plist
+  # 可选签名/公证：CSC_LINK、APPLE_ID、APPLE_APP_SPECIFIC_PASSWORD、APPLE_TEAM_ID
+
+dmg:
+  artifactName: ${productName}-${version}-mac-${arch}.${ext}
+
+linux:
+  target:
+    - target: AppImage
+      arch: [x64]
+  category: Utility
+  artifactName: ${productName}-${version}-linux-${arch}.${ext}

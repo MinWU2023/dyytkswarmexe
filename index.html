@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light">
+  <meta name="theme-color" content="#e8f4ff">
+  <title>TKSwarm Client</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <div class="bg-mesh" aria-hidden="true"></div>
+  <div class="bg-grid" aria-hidden="true"></div>
+
+  <div class="app-shell">
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true">
+          <span class="brand-orbit"></span>
+          <span class="brand-core"></span>
+        </div>
+        <div class="brand-text">
+          <div class="brand-name">TKSwarm</div>
+          <div class="brand-sub">客服端安装助手</div>
+        </div>
+      </div>
+      <div class="topbar-actions">
+        <button type="button" class="btn ghost" id="btn-recheck">重新检测</button>
+        <button type="button" class="btn soft" id="btn-settings">服务器</button>
+      </div>
+    </header>
+
+    <main class="main">
+      <section class="hero">
+        <h1>一键就绪 · 本机环境</h1>
+        <p>检测 Node / 比特浏览器，引导安装，并从版本中心一键部署代码包。</p>
+        <div class="hero-pills">
+          <span class="pill" id="pill-api">API · 未配置</span>
+          <span class="pill" id="pill-channel">通道 · stable</span>
+          <span class="pill" id="pill-platform">平台 · …</span>
+        </div>
+      </section>
+
+      <section class="cards" id="env-cards">
+        <article class="card" data-key="node">
+          <div class="card-head">
+            <div class="icon-wrap node">
+              <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2l8.5 4.9v9.8L12 22l-8.5-5.3V6.9L12 2z"/><path d="M12 22V12"/><path d="M20.5 6.9L12 12 3.5 6.9"/></svg>
+            </div>
+            <div>
+              <h2>Node.js</h2>
+              <p class="muted">本机服务引擎 · 默认 :8400</p>
+            </div>
+            <span class="status" id="status-node">检测中</span>
+          </div>
+          <div class="card-body">
+            <div class="meta" id="meta-node">正在探测…</div>
+            <div class="card-actions">
+              <button type="button" class="btn primary" id="btn-install-node">下载 Node 安装包</button>
+              <button type="button" class="btn ghost" id="btn-open-node-site">官网</button>
+            </div>
+          </div>
+        </article>
+
+        <article class="card" data-key="bit">
+          <div class="card-head">
+            <div class="icon-wrap bit">
+              <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M8 20h8"/><path d="M12 18v2"/><circle cx="8.5" cy="11" r="1.2" fill="currentColor" stroke="none"/><circle cx="15.5" cy="11" r="1.2" fill="currentColor" stroke="none"/></svg>
+            </div>
+            <div>
+              <h2>比特浏览器</h2>
+              <p class="muted">指纹环境 · 本地 API :54345</p>
+            </div>
+            <span class="status" id="status-bit">检测中</span>
+          </div>
+          <div class="card-body">
+            <div class="meta" id="meta-bit">正在探测…</div>
+            <div class="card-actions">
+              <button type="button" class="btn primary" id="btn-install-bit">打开官方下载</button>
+              <button type="button" class="btn soft" id="btn-bit-local">运行本地安装包</button>
+              <button type="button" class="btn ghost" id="btn-open-bit-site">官网</button>
+            </div>
+          </div>
+        </article>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <div>
+            <h2>代码包部署</h2>
+            <p class="muted">从线上版本中心下载 zip → 解压 → npm install → 启动服务。</p>
+          </div>
+          <div class="panel-acts">
+            <select id="channel-select" class="select" title="发布通道">
+              <option value="stable">正式 stable</option>
+              <option value="beta">测试 beta</option>
+            </select>
+            <button type="button" class="btn soft" id="btn-refresh-versions">刷新目录</button>
+            <button type="button" class="btn primary" id="btn-deploy-latest">一键部署最新</button>
+          </div>
+        </div>
+
+        <div class="deploy-row">
+          <label class="deploy-label" for="deploy-dir-input">部署目录</label>
+          <input type="text" id="deploy-dir-input" class="deploy-input" placeholder="例如 ~/TkSwarm 或 D:\TkSwarm" spellcheck="false">
+          <button type="button" class="btn soft" id="btn-browse-dir">浏览…</button>
+          <button type="button" class="btn ghost" id="btn-open-dir">打开</button>
+        </div>
+        <div class="deploy-opts">
+          <label class="check"><input type="checkbox" id="chk-npm" checked> 部署后执行 npm install</label>
+          <label class="check"><input type="checkbox" id="chk-start" checked> 部署后启动服务</label>
+          <button type="button" class="btn soft tiny" id="btn-start-only">仅启动服务</button>
+          <button type="button" class="btn soft tiny" id="btn-download-only">仅浏览器下载</button>
+        </div>
+        <div class="progress-wrap" id="progress-wrap" hidden>
+          <div class="progress-label" id="progress-label">准备中…</div>
+          <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
+        </div>
+
+        <div class="latest-banner" id="latest-banner">
+          <div class="latest-label">最新版本</div>
+          <div class="latest-main" id="latest-main">加载中…</div>
+          <div class="latest-desc" id="latest-desc"></div>
+        </div>
+        <div class="table-wrap">
+          <table class="ver-table">
+            <thead>
+              <tr>
+                <th>版本</th>
+                <th>标题</th>
+                <th>大小</th>
+                <th>次数</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="version-tbody">
+              <tr><td colspan="5" class="empty-cell">正在加载版本目录…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="tips">
+        <h3>推荐流程</h3>
+        <ol>
+          <li>安装 <b>Node.js</b>（Windows 勾选 Add to PATH；macOS 用官网 pkg），完成后重启本客户端。</li>
+          <li>安装并启动 <b>比特浏览器</b>，确认本地 API 为 <code>http://127.0.0.1:54345</code>。</li>
+          <li>选择部署目录，点击 <b>一键部署最新</b>。</li>
+          <li>浏览器打开 <code>http://127.0.0.1:8400</code> 使用客服端。</li>
+        </ol>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <span id="footer-ver">TKSwarm Client</span>
+      <span class="dot">·</span>
+      <span>Electron · CI 云构建</span>
+    </footer>
+  </div>
+
+  <div class="modal-mask" id="settings-modal" hidden>
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+      <div class="modal-head">
+        <h3 id="settings-title">服务器设置</h3>
+        <button type="button" class="icon-btn" id="btn-close-settings" aria-label="关闭">×</button>
+      </div>
+      <form id="settings-form" class="modal-body">
+        <label class="field">
+          <span>API 根地址</span>
+          <input type="url" id="api-base-input" placeholder="http://tkswarm-api.dyyweb.com" required>
+        </label>
+        <label class="field">
+          <span>Node 健康检查 URL</span>
+          <input type="url" id="node-url-input" placeholder="http://127.0.0.1:8400/api/health">
+        </label>
+        <label class="field">
+          <span>比特本地 API</span>
+          <input type="url" id="bit-url-input" placeholder="http://127.0.0.1:54345">
+        </label>
+        <p class="hint">业务版本目录走线上 PHP API；本机检测仅用于环境就绪状态。</p>
+        <div class="modal-actions">
+          <button type="button" class="btn ghost" id="btn-reset-settings">恢复默认</button>
+          <button type="submit" class="btn primary">保存</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="toast-host" id="toast-host" aria-live="polite"></div>
+
+  <script src="./config.js"></script>
+  <script src="./app.js"></script>
+</body>
+</html>

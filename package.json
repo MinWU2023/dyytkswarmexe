@@ -1,0 +1,25 @@
+{
+  "name": "tkswarm-client",
+  "version": "1.0.0",
+  "description": "TKSwarm 客服端安装助手（Electron）",
+  "author": "TKSwarm",
+  "license": "UNLICENSED",
+  "private": true,
+  "main": "main.js",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "electron .",
+    "pack": "electron-builder --dir",
+    "dist": "electron-builder --publish never",
+    "dist:win": "electron-builder --win --publish never",
+    "dist:mac": "electron-builder --mac --publish never",
+    "dist:ci": "electron-builder --publish never",
+    "dist:publish": "electron-builder --publish always"
+  },
+  "devDependencies": {
+    "electron": "^35.1.2",
+    "electron-builder": "^26.0.12"
+  }
+}
