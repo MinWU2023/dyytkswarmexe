@@ -292,7 +292,9 @@ async function startService(dir) {
   const tools = await envInstall.resolveNodeTools();
   const bat = path.join(dir, 'start.bat');
   const sh = path.join(dir, 'start.sh');
-  const enrichedEnv = Object.assign({}, process.env, (tools && tools.env) || {});
+  const enrichedEnv = Object.assign({}, process.env, (tools && tools.env) || {}, {
+    TKSWARM_NO_BROWSER: '1'
+  });
   if (process.platform === 'win32' && fs.existsSync(bat)) {
     spawn('cmd.exe', ['/c', 'start', '""', bat], {
       cwd: dir,
@@ -549,6 +551,19 @@ function registerIpc() {
       title: '选择安装包',
       filters: [
         { name: '安装包', extensions: ['exe', 'msi', 'dmg', 'pkg', 'zip'] },
+        { name: '全部', extensions: ['*'] }
+      ],
+      properties: ['openFile']
+    });
+    if (result.canceled || !result.filePaths.length) return null;
+    return result.filePaths[0];
+  });
+
+  ipcMain.handle('pick-bit-exe', async () => {
+    const result = await dialog.showOpenDialog(mainWindow, {
+      title: '选择已安装的比特浏览器程序（BitBrowser.exe）',
+      filters: [
+        { name: '可执行文件', extensions: ['exe'] },
         { name: '全部', extensions: ['*'] }
       ],
       properties: ['openFile']

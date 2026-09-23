@@ -8,10 +8,15 @@
     node: 'tkswarm_exe_node_url',
     bit: 'tkswarm_exe_bit_url',
     channel: 'tkswarm_exe_channel',
-    deploy: 'tkswarm_exe_deploy_dir'
+    deploy: 'tkswarm_exe_deploy_dir',
+    token: 'tkswarm_exe_token',
+    user: 'tkswarm_exe_user',
+    rememberUser: 'tkswarm_exe_remember_user',
+    bitPath: 'tkswarm_exe_bit_path'
   };
   var APP = { platform: 'unknown', version: CFG.appVersion || '1.0.0', defaultDeployDir: '' };
   var busy = false;
+  var authUser = null;
 
   function $(id) { return document.getElementById(id); }
 
@@ -470,7 +475,7 @@
       setEnvButtons('node', false);
     }
     try {
-      var bitInfo = await DESK.detectBit({ bitApiUrl: getBitUrl() });
+      var bitInfo = await DESK.detectBit({ bitApiUrl: getBitUrl(), hintPath: localStorage.getItem(LS.bitPath) || '' });
       envState.bitInstalled = !!(bitInfo && bitInfo.installed);
       setEnvButtons('bit', envState.bitInstalled);
       if (envState.bitInstalled) {
@@ -539,16 +544,20 @@
 
     if (DESK && DESK.detectBit) {
       try {
-        var info = await DESK.detectBit({ bitApiUrl: base });
+        var info = await DESK.detectBit({
+          bitApiUrl: base,
+          hintPath: localStorage.getItem(LS.bitPath) || ''
+        });
         envState.bitInstalled = !!(info && info.installed);
         setEnvButtons('bit', envState.bitInstalled);
         if (info && info.installed) {
+          if (info.path) localStorage.setItem(LS.bitPath, info.path);
           installTip = '已安装比特浏览器'
             + (info.version ? ' v' + info.version : '')
             + (info.path ? '<br><code>' + esc(info.path) + '</code>' : (info.source === 'api' ? '<br>（通过本地 API 确认已安装）' : ''))
             + (info.source ? '<br><span class="muted">检测来源：' + esc(info.source) + '</span>' : '');
         } else {
-          installTip = '未检测到比特浏览器。已检查常见目录、开始菜单、注册表与进程。';
+          installTip = '未检测到比特浏览器。已检查常见目录、开始菜单、注册表与进程。<br>可点「指定已安装位置」手动选择 BitBrowser.exe；或先启动比特并确认本地 API 端口。';
         }
       } catch (e) {
         setEnvButtons('bit', false);
@@ -674,9 +683,116 @@
     }
   }
 
+  function getAuthToken() {
+    return localStorage.getItem(LS.token) || '';
+  }
+
+  function setAuthSession(token, user) {
+    if (token) localStorage.setItem(LS.token, token);
+    else localStorage.removeItem(LS.token);
+    if (user) {
+      authUser = user;
+      try { localStorage.setItem(LS.user, JSON.stringify(user)); } catch (e) { /* ignore */ }
+    } else {
+      authUser = null;
+      localStorage.removeItem(LS.user);
+    }
+    renderUserChip();
+  }
+
+  function clearAuthSession() {
+    setAuthSession('', null);
+  }
+
+  function loadCachedUser() {
+    try {
+      var raw = localStorage.getItem(LS.user);
+      if (raw) authUser = JSON.parse(raw);
+    } catch (e) {
+      authUser = null;
+    }
+  }
+
+  function renderUserChip() {
+    var chip = $('user-chip');
+    var btn = $('btn-logout');
+    var name = (authUser && (authUser.nickname || authUser.username)) || '';
+    if (chip) {
+      chip.textContent = name || '';
+      chip.hidden = !name;
+    }
+    if (btn) btn.hidden = !getAuthToken();
+  }
+
+  function showLoginGate(msg) {
+    var gate = $('login-gate');
+    var shell = $('app-shell');
+    if (gate) gate.hidden = false;
+    if (shell) shell.hidden = true;
+    var err = $('login-error');
+    if (err) {
+      if (msg) {
+        err.hidden = false;
+        err.textContent = msg;
+      } else {
+        err.hidden = true;
+        err.textContent = '';
+      }
+    }
+    var remembered = localStorage.getItem(LS.rememberUser) || '';
+    if ($('login-username') && !$('login-username').value && remembered) {
+      $('login-username').value = remembered;
+    }
+  }
+
+  function showApp() {
+    var gate = $('login-gate');
+    var shell = $('app-shell');
+    if (gate) gate.hidden = true;
+    if (shell) shell.hidden = false;
+    renderUserChip();
+  }
+
+  function getNodeBase() {
+    var health = getNodeUrl();
+    var m = String(health || '').match(/^(https?:\/\/[^/]+)/i);
+    return (m && m[1]) || 'http://127.0.0.1:8400';
+  }
+
+  function sleep(ms) {
+    return new Promise(function (resolve) { setTimeout(resolve, ms); });
+  }
+
+  async function waitNodeReady(timeoutMs) {
+    var deadline = Date.now() + (timeoutMs || 50000);
+    while (Date.now() < deadline) {
+      try {
+        var res = await fetch(getNodeUrl(), { cache: 'no-store' });
+        if (res.ok) return true;
+      } catch (e) { /* retry */ }
+      await sleep(900);
+    }
+    return false;
+  }
+
+  async function openNodeWithLoginToken() {
+    var token = getAuthToken();
+    var base = getNodeBase();
+    var url = base + '/';
+    if (token) url = base + '/?loginToken=' + encodeURIComponent(token);
+    var ready = await waitNodeReady(50000);
+    if (!ready) {
+      toast('服务启动较慢，仍尝试打开页面…', 'warn');
+    }
+    openExternal(url);
+  }
+
   async function apiGet(path) {
     var url = getApiBase() + '/api' + path;
-    var res = await fetch(url, { cache: 'no-store' });
+    var headers = { Accept: 'application/json' };
+    var token = getAuthToken();
+    if (token) headers.Authorization = 'Bearer ' + token;
+    var res = await fetch(url, { cache: 'no-store', headers: headers });
     var json = await res.json().catch(function () { return { success: false, message: '响应无效' }; });
     if (!res.ok || !json.success) throw new Error(json.message || ('请求失败 HTTP ' + res.status));
     return json.data;
@@ -684,15 +800,64 @@
 
   async function apiPost(path, body) {
     var url = getApiBase() + '/api' + path;
+    var headers = { 'Content-Type': 'application/json', Accept: 'application/json' };
+    var token = getAuthToken();
+    if (token) headers.Authorization = 'Bearer ' + token;
     var res = await fetch(url, {
       method: 'POST',
       cache: 'no-store',
-      headers: { 'Content-Type': 'application/json' },
+      headers: headers,
       body: JSON.stringify(body || {})
     });
     var json = await res.json().catch(function () { return { success: false, message: '响应无效' }; });
     if (!res.ok || !json.success) throw new Error(json.message || ('请求失败 HTTP ' + res.status));
     return json.data;
+  }
+
+  async function tryRestoreAuth() {
+    try {
+      var st = await apiGet('/auth/status');
+      if (st && st.authEnabled === false) {
+        loadCachedUser();
+        return true;
+      }
+      if (!getAuthToken()) return false;
+      if (st && st.authenticated) {
+        authUser = st.user || authUser;
+        if (st.user) {
+          try { localStorage.setItem(LS.user, JSON.stringify(st.user)); } catch (e) { /* ignore */ }
+        }
+        return true;
+      }
+      clearAuthSession();
+      return false;
+    } catch (e) {
+      if (getAuthToken()) {
+        loadCachedUser();
+        return true;
+      }
+      return false;
+    }
+  }
+
+  async function doLogin(username, password, rememberMe) {
+    var data = await apiPost('/auth/login', {
+      username: username,
+      password: password,
+      rememberMe: !!rememberMe
+    });
+    if (!data || !data.token) throw new Error('登录成功但未返回令牌');
+    setAuthSession(data.token, data.user || { username: username });
+    if (rememberMe) localStorage.setItem(LS.rememberUser, username);
+    else localStorage.removeItem(LS.rememberUser);
+    return data;
+  }
+
+  async function doLogout() {
+    try { await apiPost('/auth/logout', {}); } catch (e) { /* ignore */ }
+    clearAuthSession();
+    showLoginGate();
+    toast('已退出登录', 'ok');
   }
 
   var currentPage = 'home';
@@ -945,7 +1110,7 @@
         envState.nodeInstalled = false;
       }
       try {
-        var bitInfo = await DESK.detectBit({ bitApiUrl: getBitUrl() });
+        var bitInfo = await DESK.detectBit({ bitApiUrl: getBitUrl(), hintPath: localStorage.getItem(LS.bitPath) || '' });
         envState.bitInstalled = !!(bitInfo && bitInfo.installed);
       } catch (e2) {
         envState.bitInstalled = false;
@@ -1055,6 +1220,9 @@
       });
       toast('部署完成：' + (result && result.deployDir ? result.deployDir : dir), 'ok');
       await checkNode();
+      if (doStart) {
+        try { await openNodeWithLoginToken(); } catch (e) { /* ignore */ }
+      }
     } catch (err) {
       toast((err && err.message) || String(err), 'error');
     } finally {
@@ -1087,6 +1255,40 @@
       });
     });
     $('ticket-form') && $('ticket-form').addEventListener('submit', submitTicket);
+
+    $('login-form') && $('login-form').addEventListener('submit', async function (e) {
+      e.preventDefault();
+      var username = ($('login-username') && $('login-username').value || '').trim();
+      var password = ($('login-password') && $('login-password').value || '');
+      var remember = !!($('login-remember') && $('login-remember').checked);
+      var btn = $('btn-login');
+      var err = $('login-error');
+      if (!username || !password) {
+        if (err) { err.hidden = false; err.textContent = '请输入账号和密码'; }
+        return;
+      }
+      if (btn) { btn.disabled = true; btn.textContent = '登录中…'; }
+      if (err) err.hidden = true;
+      try {
+        await doLogin(username, password, remember);
+        if ($('login-password')) $('login-password').value = '';
+        showApp();
+        toast('登录成功', 'ok');
+        updatePills();
+        recheckAll();
+        loadVersions();
+        loadEnvCatalogs().catch(function () { /* ignore */ });
+      } catch (ex) {
+        if (err) {
+          err.hidden = false;
+          err.textContent = (ex && ex.message) || '登录失败';
+        }
+      } finally {
+        if (btn) { btn.disabled = false; btn.textContent = '登录'; }
+      }
+    });
+    $('btn-login-api') && $('btn-login-api').addEventListener('click', openSettings);
+    $('btn-logout') && $('btn-logout').addEventListener('click', function () { doLogout(); });
 
     $('btn-recheck') && $('btn-recheck').addEventListener('click', function () { recheckAll(); });
     $('btn-settings') && $('btn-settings').addEventListener('click', openSettings);
@@ -1137,6 +1339,21 @@
     $('btn-bit-local') && $('btn-bit-local').addEventListener('click', function () {
       runEnvAction('bit', 'local');
     });
+    $('btn-bit-locate') && $('btn-bit-locate').addEventListener('click', async function () {
+      if (!DESK || !DESK.pickBitExe) {
+        toast('请在桌面客户端中操作', 'error');
+        return;
+      }
+      try {
+        var file = await DESK.pickBitExe();
+        if (!file) return;
+        localStorage.setItem(LS.bitPath, file);
+        toast('已记录比特路径，正在重新检测…', 'ok');
+        await checkBit();
+      } catch (err) {
+        toast((err && err.message) || String(err), 'error');
+      }
+    });
     $('btn-browse-dir') && $('btn-browse-dir').addEventListener('click', async function () {
       if (!DESK || !DESK.pickDirectory) {
         toast('请在 Electron 客户端中选择目录', 'error');
@@ -1165,10 +1382,15 @@
         toast('请在 Electron 客户端中启动', 'error');
         return;
       }
+      if (!getAuthToken()) {
+        showLoginGate('请先登录后再启动');
+        return;
+      }
       try {
         var info = await DESK.startService(dir);
         toast('已启动（' + ((info && info.method) || 'service') + '）', 'ok');
         setTimeout(checkNode, 2500);
+        await openNodeWithLoginToken();
       } catch (err) {
         toast((err && err.message) || String(err), 'error');
       }
@@ -1205,6 +1427,15 @@
     enhanceAllSelects();
 
     bind();
+    loadCachedUser();
+
+    var ok = await tryRestoreAuth();
+    if (!ok) {
+      showLoginGate();
+      return;
+    }
+
+    showApp();
     updatePills();
     recheckAll();
     loadVersions();

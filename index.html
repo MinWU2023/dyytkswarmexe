@@ -12,9 +12,39 @@
   <div class="bg-mesh" aria-hidden="true"></div>
   <div class="bg-grid" aria-hidden="true"></div>
 
-  <div class="app-shell">
+  <div class="login-gate" id="login-gate" hidden>
+    <div class="login-card">
+      <div class="login-brand">
+        <img class="login-logo" src="./logo.png" alt="Dyy TkSwarm" width="48" height="48" onerror="this.style.display='none'">
+        <div>
+          <div class="login-title">Dyy TkSwarm</div>
+          <div class="login-sub">登录后管理本机环境与部署</div>
+        </div>
+      </div>
+      <form id="login-form" class="login-form" autocomplete="on">
+        <label class="field">
+          <span>账号</span>
+          <input type="text" id="login-username" name="username" required maxlength="80" placeholder="管理员账号" autocomplete="username">
+        </label>
+        <label class="field">
+          <span>密码</span>
+          <input type="password" id="login-password" name="password" required maxlength="128" placeholder="登录密码" autocomplete="current-password">
+        </label>
+        <label class="login-remember">
+          <input type="checkbox" id="login-remember" checked>
+          <span>记住登录（30 天）</span>
+        </label>
+        <p class="login-error" id="login-error" hidden></p>
+        <button type="submit" class="btn primary login-submit" id="btn-login">登录</button>
+        <button type="button" class="btn ghost login-api-btn" id="btn-login-api">服务器设置</button>
+      </form>
+      <p class="login-hint muted">账号与运营控制台相同，登录接口：API /api/auth/login</p>
+    </div>
+  </div>
+
+  <div class="app-shell" id="app-shell" hidden>
     <nav class="app-nav" id="app-nav" aria-label="主导航">
-      <button type="button" class="nav-link active" data-page="home">首页</button>
+      <button type="button" class="nav-link active" data-page="home">视频矩阵</button>
       <button type="button" class="nav-link" data-page="docs">帮助文档</button>
       <button type="button" class="nav-link" data-page="ticket">工单反馈</button>
     </nav>
@@ -31,6 +61,8 @@
         </div>
       </div>
       <div class="topbar-actions">
+        <span class="user-chip" id="user-chip" hidden></span>
+        <button type="button" class="btn ghost" id="btn-logout" hidden>退出登录</button>
         <button type="button" class="btn ghost" id="btn-recheck">重新检测</button>
         <button type="button" class="btn soft" id="btn-settings">服务器</button>
       </div>
@@ -39,8 +71,8 @@
     <main class="main">
       <div class="page" id="page-home">
         <section class="hero">
-          <h1>一键就绪 · 本机环境</h1>
-          <p>检测 Node / 比特浏览器，引导安装，并从版本中心一键部署代码包。</p>
+          <h1>视频矩阵 · 本机就绪</h1>
+          <p>检测 Node / 比特浏览器，引导安装，并从版本中心一键部署矩阵程序。</p>
         </section>
 
         <section class="cards" id="env-cards">
@@ -90,6 +122,7 @@
                 <button type="button" class="btn primary" id="btn-install-bit">安装</button>
                 <button type="button" class="btn soft danger" id="btn-uninstall-bit" hidden>卸载</button>
                 <button type="button" class="btn soft" id="btn-bit-local">选择安装包安装</button>
+                <button type="button" class="btn ghost" id="btn-bit-locate">指定已安装位置</button>
                 <button type="button" class="btn ghost" id="btn-open-bit-site">官网</button>
               </div>
             </div>

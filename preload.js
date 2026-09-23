@@ -20,6 +20,7 @@ contextBridge.exposeInMainWorld('tkswarmDesktop', {
   startService: (dir) => ipcRenderer.invoke('start-service', dir),
   detectNode: () => ipcRenderer.invoke('detect-node'),
   detectBit: (options) => ipcRenderer.invoke('detect-bit', options || {}),
+  pickBitExe: () => ipcRenderer.invoke('pick-bit-exe'),
   resolveNodeTools: () => ipcRenderer.invoke('resolve-node-tools'),
   installNode: (versionMeta) => ipcRenderer.invoke('install-node', versionMeta),
   uninstallNode: () => ipcRenderer.invoke('uninstall-node'),

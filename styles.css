@@ -829,6 +829,83 @@ body {
 }
 .ver-table td.acts { white-space: nowrap; }
 
+/* ---- Login gate ---- */
+.login-gate {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  animation: fadeIn 0.35s ease both;
+}
+.login-gate[hidden] { display: none !important; }
+.login-card {
+  width: min(400px, 100%);
+  padding: 28px 26px 22px;
+  background: rgba(255, 255, 255, 0.86);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  backdrop-filter: blur(14px);
+  box-shadow: var(--shadow);
+  animation: popIn 0.4s ease both;
+}
+.login-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+.login-logo {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  object-fit: cover;
+  box-shadow: 0 8px 18px rgba(26, 125, 255, 0.2);
+}
+.login-title {
+  font-size: 20px;
+  font-weight: 750;
+  letter-spacing: 0.02em;
+  background: linear-gradient(90deg, #0b2a55, #1a7dff 55%, #00a7c4);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.login-sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
+.login-form { display: flex; flex-direction: column; gap: 12px; }
+.login-remember {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--ink-soft);
+  user-select: none;
+}
+.login-remember input { width: 15px; height: 15px; accent-color: var(--primary); }
+.login-error {
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: rgba(214, 69, 69, 0.08);
+  color: var(--err);
+  font-size: 13px;
+}
+.login-error[hidden] { display: none !important; }
+.login-submit { width: 100%; min-height: 44px; }
+.login-api-btn { width: 100%; }
+.login-hint { margin: 14px 0 0; font-size: 12px; line-height: 1.5; text-align: center; }
+.user-chip {
+  font-size: 13px;
+  color: var(--ink-soft);
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.app-shell[hidden] { display: none !important; }
+
 @keyframes riseIn {
   from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: translateY(0); }

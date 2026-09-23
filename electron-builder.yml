@@ -21,6 +21,7 @@ files:
   - app.js
   - config.js
   - package.json
+  - logo.png
   - lib/**/*
   # icon 只放 buildResources，勿打进 asar
   - "!**/*.md"
