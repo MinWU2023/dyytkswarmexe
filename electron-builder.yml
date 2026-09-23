@@ -52,7 +52,7 @@ mac:
   gatekeeperAssess: false
   entitlements: build/entitlements.mac.plist
   entitlementsInherit: build/entitlements.mac.plist
-  # 可选签名/公证：CSC_LINK、APPLE_ID、APPLE_APP_SPECIFIC_PASSWORD、APPLE_TEAM_ID
+  # 可选签名/公证：在 GitHub Secrets 配置 CSC_LINK 等（勿留空字符串）
 
 dmg:
   artifactName: ${productName}-${version}-mac-${arch}.${ext}
