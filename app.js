@@ -44,7 +44,7 @@
   }
 
   function getNodeUrl() {
-    return stripSlash(localStorage.getItem(LS.node) || CFG.nodeHealthUrl || 'http://127.0.0.1:8400/api/health');
+    return stripSlash(localStorage.getItem(LS.node) || CFG.nodeHealthUrl || 'http://127.0.0.1:8999/api/health');
   }
 
   function getBitUrl() {
@@ -186,9 +186,46 @@
     function placePanel() {
       panel.classList.remove('drop-up');
       var rect = trigger.getBoundingClientRect();
-      var spaceBelow = window.innerHeight - rect.bottom;
-      if (spaceBelow < 220 && rect.top > spaceBelow) {
-        panel.classList.add('drop-up');
+      var maxH = Math.min(280, Math.floor(window.innerHeight * 0.42));
+      var spaceBelow = window.innerHeight - rect.bottom - 10;
+      var spaceAbove = rect.top - 10;
+      var dropUp = spaceBelow < 180 && spaceAbove > spaceBelow;
+      if (dropUp) panel.classList.add('drop-up');
+
+      var width = Math.max(rect.width, 160);
+      // 挂到 body，避开 app-shell / cards 的 overflow 与 transform 裁切
+      if (panel.parentNode !== document.body) {
+        document.body.appendChild(panel);
+      }
+      panel.classList.add('is-portaled');
+      panel.style.position = 'fixed';
+      panel.style.left = Math.min(rect.left, window.innerWidth - width - 8) + 'px';
+      panel.style.width = width + 'px';
+      panel.style.right = 'auto';
+      panel.style.zIndex = '300';
+      if (dropUp) {
+        panel.style.top = 'auto';
+        panel.style.bottom = (window.innerHeight - rect.top + 6) + 'px';
+        panel.style.maxHeight = Math.min(maxH, spaceAbove) + 'px';
+      } else {
+        panel.style.bottom = 'auto';
+        panel.style.top = (rect.bottom + 6) + 'px';
+        panel.style.maxHeight = Math.min(maxH, Math.max(120, spaceBelow)) + 'px';
+      }
+    }
+
+    function clearPanelPos() {
+      panel.classList.remove('is-portaled', 'drop-up');
+      panel.style.position = '';
+      panel.style.left = '';
+      panel.style.width = '';
+      panel.style.right = '';
+      panel.style.top = '';
+      panel.style.bottom = '';
+      panel.style.maxHeight = '';
+      panel.style.zIndex = '';
+      if (panel.parentNode !== wrap) {
+        wrap.appendChild(panel);
       }
     }
 
@@ -197,15 +234,24 @@
       closeAllPrettySelects(inst);
       open = true;
       wrap.classList.add('open');
+      var card = wrap.closest('.card, .panel');
+      var cards = wrap.closest('.cards');
+      if (card) card.classList.add('has-open-select');
+      if (cards) cards.classList.add('has-open-select');
       trigger.setAttribute('aria-expanded', 'true');
-      placePanel();
       rebuildOptions();
+      placePanel();
     }
 
     function close() {
       open = false;
       wrap.classList.remove('open');
+      var card = wrap.closest('.card, .panel');
+      var cards = wrap.closest('.cards');
+      if (card) card.classList.remove('has-open-select');
+      if (cards) cards.classList.remove('has-open-select');
       trigger.setAttribute('aria-expanded', 'false');
+      clearPanelPos();
     }
 
     function toggle() {
@@ -219,6 +265,9 @@
       toggle();
     });
     wrap.addEventListener('click', function (e) {
+      e.stopPropagation();
+    });
+    panel.addEventListener('click', function (e) {
       e.stopPropagation();
     });
 
@@ -241,6 +290,12 @@
     };
     prettySelects.push(inst);
     rebuildOptions();
+    window.addEventListener('resize', function () {
+      if (open) placePanel();
+    });
+    window.addEventListener('scroll', function () {
+      if (open) placePanel();
+    }, true);
     return inst;
   }
 
@@ -532,7 +587,7 @@
     }
     // 本机 Node 已装，只是业务服务未起 —— 显示「已安装」，不要「不确定」
     setStatus('node', 'installed',
-      installTip + '<br>服务未启动（默认 <code>127.0.0.1:8400</code>），请部署并启动代码包。');
+      installTip + '<br>服务未启动（默认 <code>127.0.0.1:8999</code>），请部署并启动代码包。');
     return false;
   }
 
@@ -718,8 +773,21 @@
     var btn = $('btn-logout');
     var name = (authUser && (authUser.nickname || authUser.username)) || '';
     if (chip) {
-      chip.textContent = name || '';
-      chip.hidden = !name;
+      if (name) {
+        var initial = String(name).trim().charAt(0).toUpperCase() || 'U';
+        chip.hidden = false;
+        chip.innerHTML =
+          '<span class="user-chip-avatar" aria-hidden="true">' + esc(initial) + '</span>'
+          + '<span class="user-chip-meta">'
+          + '<span class="user-chip-label">已登录</span>'
+          + '<span class="user-chip-name">' + esc(name) + '</span>'
+          + '</span>';
+        chip.title = name;
+      } else {
+        chip.hidden = true;
+        chip.innerHTML = '';
+        chip.removeAttribute('title');
+      }
     }
     if (btn) btn.hidden = !getAuthToken();
   }
@@ -756,7 +824,7 @@
   function getNodeBase() {
     var health = getNodeUrl();
     var m = String(health || '').match(/^(https?:\/\/[^/]+)/i);
-    return (m && m[1]) || 'http://127.0.0.1:8400';
+    return (m && m[1]) || 'http://127.0.0.1:8999';
   }
 
   function sleep(ms) {

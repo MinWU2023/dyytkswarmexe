@@ -8,7 +8,7 @@ window.__TKSWARM_EXE_CONFIG__ = {
   appName: 'Dyy TKSwarm Client',
   appVersion: '1.0.0',
   defaultApiBase: 'http://tkswarm-api.dyyweb.com',
-  nodeHealthUrl: 'http://127.0.0.1:8400/api/health',
+  nodeHealthUrl: 'http://127.0.0.1:8999/api/health',
   bitApiUrl: 'http://127.0.0.1:54345',
   downloads: {
     node: 'https://nodejs.org/zh-cn/download/',

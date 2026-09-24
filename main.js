@@ -164,7 +164,7 @@ function ensureDotEnv(dir, apiBase) {
   if (fs.existsSync(envPath)) return;
   const body = [
     `TKSWARM_API_BASE=${apiBase || 'http://tkswarm-api.dyyweb.com'}`,
-    'TKSWARM_PORT=8400',
+    'TKSWARM_PORT=8999',
     'TKSWARM_HOST=127.0.0.1',
     'BIT_API_URL=http://127.0.0.1:54345',
     ''
