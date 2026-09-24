@@ -393,6 +393,7 @@
   var envState = {
     nodeInstalled: false,
     bitInstalled: false,
+    bitPath: '',
     busy: false
   };
 
@@ -501,6 +502,24 @@
       uninstallBtn.hidden = !installed;
       uninstallBtn.disabled = !!envState.busy;
     }
+    if (target === 'bit') {
+      var hasPath = !!(envState.bitPath || localStorage.getItem(LS.bitPath));
+      var startBtn = $('btn-start-bit');
+      var locateBtn = $('btn-bit-locate');
+      // 启动：已安装且已指定/检测到程序路径后才显示
+      if (startBtn) {
+        startBtn.hidden = !(installed && hasPath);
+        startBtn.disabled = !!envState.busy;
+      }
+      // 指定位置：随时可点；无路径时强调，便于露出「启动」
+      if (locateBtn) {
+        locateBtn.hidden = false;
+        locateBtn.disabled = !!envState.busy;
+        locateBtn.textContent = hasPath ? '更改位置' : '指定位置';
+        locateBtn.classList.toggle('primary', !hasPath && !!installed);
+        locateBtn.classList.toggle('soft', !(!hasPath && !!installed));
+      }
+    }
   }
 
   function showEnvProgress(message) {
@@ -532,11 +551,17 @@
     try {
       var bitInfo = await DESK.detectBit({ bitApiUrl: getBitUrl(), hintPath: localStorage.getItem(LS.bitPath) || '' });
       envState.bitInstalled = !!(bitInfo && bitInfo.installed);
+      if (bitInfo && bitInfo.path) {
+        envState.bitPath = bitInfo.path;
+        localStorage.setItem(LS.bitPath, bitInfo.path);
+      } else {
+        envState.bitPath = localStorage.getItem(LS.bitPath) || '';
+      }
       setEnvButtons('bit', envState.bitInstalled);
       if (envState.bitInstalled) {
         var tip2 = '已安装比特浏览器'
           + (bitInfo.version ? ' v' + bitInfo.version : '')
-          + (bitInfo.path ? '<br><code>' + esc(bitInfo.path) + '</code>' : '');
+          + (bitInfo.path || envState.bitPath ? '<br><code>' + esc(bitInfo.path || envState.bitPath) + '</code>' : '');
         $('meta-bit') && ($('meta-bit').dataset.installTip = tip2);
       }
     } catch (e2) {
@@ -595,6 +620,7 @@
     setStatus('bit', 'checking', '正在检测比特浏览器…');
     var installTip = '';
     envState.bitInstalled = false;
+    envState.bitPath = localStorage.getItem(LS.bitPath) || '';
     var base = getBitUrl();
 
     if (DESK && DESK.detectBit) {
@@ -604,15 +630,18 @@
           hintPath: localStorage.getItem(LS.bitPath) || ''
         });
         envState.bitInstalled = !!(info && info.installed);
+        if (info && info.path) {
+          envState.bitPath = info.path;
+          localStorage.setItem(LS.bitPath, info.path);
+        }
         setEnvButtons('bit', envState.bitInstalled);
         if (info && info.installed) {
-          if (info.path) localStorage.setItem(LS.bitPath, info.path);
           installTip = '已安装比特浏览器'
             + (info.version ? ' v' + info.version : '')
-            + (info.path ? '<br><code>' + esc(info.path) + '</code>' : (info.source === 'api' ? '<br>（通过本地 API 确认已安装）' : ''))
-            + (info.source ? '<br><span class="muted">检测来源：' + esc(info.source) + '</span>' : '');
+            + (info.path ? '<br><code>' + esc(info.path) + '</code>' : '')
+            + (!info.path ? '<br><span class="muted">请点击「指定位置」选择 BitBrowser.exe，即可显示启动按钮</span>' : '');
         } else {
-          installTip = '未检测到比特浏览器。已检查常见目录、开始菜单、注册表与进程。<br>可点「指定已安装位置」手动选择 BitBrowser.exe；或先启动比特并确认本地 API 端口。';
+          installTip = '未检测到比特浏览器。可选择版本后点「安装」，或先安装后「指定位置」。';
         }
       } catch (e) {
         setEnvButtons('bit', false);
@@ -644,10 +673,9 @@
       return null;
     }
     if (!envState.bitInstalled) {
-      setStatus('bit', 'offline', installTip + '<br>可选择版本安装，或「选择安装包安装」。');
+      setStatus('bit', 'offline', installTip + '<br>选择版本后点击「安装」。');
       return false;
     }
-    // 已安装但本地 API 未开 —— 显示「已安装」
     setStatus('bit', 'installed',
       installTip + '<br>请启动比特并开启本地 API <code>' + esc(base) + '</code>');
     return false;
@@ -695,12 +723,17 @@
         }
       } else if (kind === 'bit' && action === 'install') {
         var bv = getSelectedEnvVersion('bit-ver-select', bitVersionList());
-        if (!bv) throw new Error('请选择比特版本');
-        if (!bv.downloadUrl && !bv.winUrl && !bv.macUrl) {
-          throw new Error('该版本暂无安装包直链，请在运营后台「环境安装包」上传/填写链接并发布');
+        var hasUrl = !!(bv && (bv.downloadUrl || bv.winUrl || bv.macUrl));
+        if (hasUrl) {
+          await DESK.installBit({ version: bv });
+          toast('比特安装流程已完成', 'ok');
+        } else {
+          // 无直链时改为选择本地安装包
+          var file = await DESK.pickInstallerFile();
+          if (!file) return;
+          await DESK.installBit({ version: bv || {}, localFile: file });
+          toast('已启动本地安装包', 'ok');
         }
-        await DESK.installBit({ version: bv });
-        toast('比特安装流程已完成', 'ok');
       } else if (kind === 'bit' && action === 'uninstall') {
         if (DESK.showConfirm) {
           var okUn = await DESK.showConfirm({
@@ -714,6 +747,8 @@
         }
         await DESK.uninstallBit();
         toast('比特浏览器已卸载', 'ok');
+        localStorage.removeItem(LS.bitPath);
+        envState.bitPath = '';
       } else if (kind === 'bit' && action === 'local') {
         var file = await DESK.pickInstallerFile();
         if (!file) return;
@@ -1392,20 +1427,42 @@
     $('btn-uninstall-node') && $('btn-uninstall-node').addEventListener('click', function () {
       runEnvAction('node', 'uninstall');
     });
-    $('btn-open-node-site') && $('btn-open-node-site').addEventListener('click', function () {
-      openExternal((CFG.downloads && CFG.downloads.node) || 'https://nodejs.org/');
-    });
     $('btn-install-bit') && $('btn-install-bit').addEventListener('click', function () {
       runEnvAction('bit', 'install');
     });
     $('btn-uninstall-bit') && $('btn-uninstall-bit').addEventListener('click', function () {
       runEnvAction('bit', 'uninstall');
     });
-    $('btn-open-bit-site') && $('btn-open-bit-site').addEventListener('click', function () {
-      openExternal((CFG.downloads && CFG.downloads.bit) || 'https://www.bitbrowser.cn/');
-    });
-    $('btn-bit-local') && $('btn-bit-local').addEventListener('click', function () {
-      runEnvAction('bit', 'local');
+    $('btn-start-bit') && $('btn-start-bit').addEventListener('click', async function () {
+      if (!DESK || !DESK.launchBit) {
+        toast('请在桌面客户端中操作', 'error');
+        return;
+      }
+      var exePath = envState.bitPath || localStorage.getItem(LS.bitPath) || '';
+      if (!exePath) {
+        toast('请先点击「指定位置」选择 BitBrowser.exe', 'error');
+        return;
+      }
+      try {
+        var result = await DESK.launchBit(exePath);
+        if (result && result.alreadyRunning) {
+          if (DESK.showMessage) {
+            await DESK.showMessage({
+              type: 'info',
+              title: '比特浏览器',
+              message: '比特浏览器已启动',
+              detail: '本地程序正在运行中，可直接使用指纹环境。\n请确认本地 API 已开启：' + getBitUrl()
+            });
+          } else {
+            toast('比特浏览器已启动', 'ok');
+          }
+          return;
+        }
+        toast('正在启动比特浏览器…', 'ok');
+        setTimeout(checkBit, 2000);
+      } catch (err) {
+        toast((err && err.message) || String(err), 'error');
+      }
     });
     $('btn-bit-locate') && $('btn-bit-locate').addEventListener('click', async function () {
       if (!DESK || !DESK.pickBitExe) {
@@ -1416,7 +1473,10 @@
         var file = await DESK.pickBitExe();
         if (!file) return;
         localStorage.setItem(LS.bitPath, file);
-        toast('已记录比特路径，正在重新检测…', 'ok');
+        envState.bitPath = file;
+        envState.bitInstalled = true;
+        setEnvButtons('bit', true);
+        toast('已记录比特路径', 'ok');
         await checkBit();
       } catch (err) {
         toast((err && err.message) || String(err), 'error');

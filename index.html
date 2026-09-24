@@ -96,7 +96,6 @@
               <div class="card-actions">
                 <button type="button" class="btn primary" id="btn-install-node">安装</button>
                 <button type="button" class="btn soft danger" id="btn-uninstall-node" hidden>卸载</button>
-                <button type="button" class="btn ghost" id="btn-open-node-site">官网</button>
               </div>
             </div>
           </article>
@@ -118,18 +117,17 @@
                 <label class="env-label" for="bit-ver-select">版本</label>
                 <select id="bit-ver-select" class="select select-version" title="比特版本"></select>
               </div>
-              <div class="card-actions">
+              <div class="card-actions card-actions-bit">
                 <button type="button" class="btn primary" id="btn-install-bit">安装</button>
                 <button type="button" class="btn soft danger" id="btn-uninstall-bit" hidden>卸载</button>
-                <button type="button" class="btn soft" id="btn-bit-local">选择安装包安装</button>
-                <button type="button" class="btn ghost" id="btn-bit-locate">指定已安装位置</button>
-                <button type="button" class="btn ghost" id="btn-open-bit-site">官网</button>
+                <button type="button" class="btn launch" id="btn-start-bit" hidden>启动</button>
+                <button type="button" class="btn soft" id="btn-bit-locate" hidden>指定位置</button>
               </div>
             </div>
           </article>
         </section>
 
-        <section class="panel">
+        <section class="panel deploy-panel">
           <div class="panel-head">
             <div>
               <h2>下载安装核心应用程序</h2>

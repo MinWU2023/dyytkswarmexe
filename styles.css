@@ -325,11 +325,17 @@ body {
   overflow-y: auto;
   overflow-x: hidden;
   padding-right: 2px;
-  /* 隐藏滚动条，滚轮仍可用 */
+  /* 隐藏竖直滚动条（内容增高时仍可滚轮滚动） */
   scrollbar-width: none;
   -ms-overflow-style: none;
 }
 .main::-webkit-scrollbar { width: 0; height: 0; display: none; }
+
+#page-home {
+  overflow: visible;
+  flex: 1 0 auto;
+  min-height: min-content;
+}
 
 .hero {
   padding: 2px 6px 0;
@@ -427,16 +433,23 @@ body {
   min-height: 40px;
   margin-bottom: 12px;
 }
-.card-actions { display: flex; flex-wrap: wrap; gap: 8px; }
-
+.card-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.card-actions-bit .btn {
+  min-width: 72px;
+  justify-content: center;
+  display: inline-flex;
+  align-items: center;
+  letter-spacing: 0.02em;
+}
 .btn {
   appearance: none; border: 0; cursor: pointer;
   font: inherit; font-size: 13px; font-weight: 600;
   padding: 9px 14px;
   border-radius: 11px;
-  transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 }
 .btn:active { transform: translateY(1px); }
+.btn[hidden] { display: none !important; }
 .btn.primary {
   color: #fff;
   background: linear-gradient(135deg, var(--primary), #3aa0ff 55%, var(--primary-2));
@@ -447,6 +460,20 @@ body {
   color: var(--primary);
   background: rgba(26, 125, 255, 0.1);
   border: 1px solid rgba(26, 125, 255, 0.16);
+}
+.btn.soft:hover {
+  background: rgba(26, 125, 255, 0.16);
+  border-color: rgba(26, 125, 255, 0.28);
+}
+.btn.launch {
+  color: #fff;
+  background: linear-gradient(135deg, #0f9f6e, #1ec8a0 58%, #12b886);
+  box-shadow: 0 8px 18px rgba(15, 159, 110, 0.28);
+  border: 1px solid rgba(15, 159, 110, 0.18);
+}
+.btn.launch:hover {
+  box-shadow: 0 10px 22px rgba(15, 159, 110, 0.38);
+  filter: brightness(1.03);
 }
 .btn.ghost {
   color: var(--ink-soft);
@@ -489,6 +516,22 @@ body {
   animation: riseIn 0.75s ease both 0.15s;
 }
 .panel.has-open-select { z-index: 20; }
+
+/* 核心应用部署区：高度随内容，进度/当前选择包在卡片内，不溢出卡片外 */
+.deploy-panel {
+  flex: 0 0 auto;
+  overflow: hidden;
+  gap: 0;
+}
+.deploy-panel .panel-head { flex-shrink: 0; }
+.deploy-panel .deploy-row,
+.deploy-panel .progress-wrap,
+.deploy-panel .latest-banner {
+  flex-shrink: 0;
+}
+.deploy-panel .latest-banner {
+  margin-top: 2px;
+}
 .panel-head {
   display: flex;
   justify-content: space-between;

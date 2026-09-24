@@ -440,6 +440,20 @@ function registerIpc() {
     return result.response === confirmIndex;
   });
 
+  ipcMain.handle('show-message', async (_e, options) => {
+    const opts = options || {};
+    await dialog.showMessageBox(mainWindow, {
+      type: opts.type || 'info',
+      title: opts.title || '提示',
+      message: opts.message || '',
+      detail: opts.detail || '',
+      buttons: opts.buttons || ['知道了'],
+      defaultId: 0,
+      noLink: true
+    });
+    return true;
+  });
+
   ipcMain.handle('pick-and-run-installer', async () => {
     const result = await dialog.showOpenDialog(mainWindow, {
       title: '选择比特浏览器安装包',
@@ -544,6 +558,14 @@ function registerIpc() {
 
   ipcMain.handle('uninstall-bit', async () => {
     return envInstall.uninstallBit((p) => sendEnvProgress(Object.assign({ target: 'bit' }, p)));
+  });
+
+  ipcMain.handle('launch-bit', async (_e, exePath) => {
+    return envInstall.launchBit(exePath);
+  });
+
+  ipcMain.handle('is-bit-running', async () => {
+    return envInstall.isBitProcessRunning();
   });
 
   ipcMain.handle('pick-installer-file', async () => {
