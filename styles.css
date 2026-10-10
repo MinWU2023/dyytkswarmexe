@@ -977,6 +977,21 @@ body {
   object-fit: cover;
   box-shadow: 0 8px 18px rgba(26, 125, 255, 0.2);
 }
+.login-logo.login-logo-wide {
+  width: auto;
+  height: 52px;
+  max-width: 200px;
+  border-radius: 0;
+  object-fit: contain;
+  box-shadow: none;
+  background: transparent;
+}
+.login-brand {
+  flex-wrap: wrap;
+}
+.login-brand-text {
+  min-width: 0;
+}
 .login-title {
   font-size: 20px;
   font-weight: 750;
