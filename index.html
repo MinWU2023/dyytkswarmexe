@@ -72,59 +72,103 @@
       <div class="page" id="page-home">
         <section class="hero">
           <h1>视频矩阵 · 本机就绪</h1>
-          <p>检测 Node / 比特浏览器，引导安装，并从版本中心一键部署矩阵程序。</p>
+          <p>检测 Node / 比特浏览器 / 第一页自研浏览器，引导安装，并从版本中心一键部署矩阵程序。</p>
         </section>
 
-        <section class="cards" id="env-cards">
-          <article class="card" data-key="node">
+        <section class="env-section" id="env-cards">
+          <!-- Node 环境单独占一行 -->
+          <article class="card card-node" data-key="node">
             <div class="card-head">
               <div class="icon-wrap node">
                 <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2l8.5 4.9v9.8L12 22l-8.5-5.3V6.9L12 2z"/><path d="M12 22V12"/><path d="M20.5 6.9L12 12 3.5 6.9"/></svg>
               </div>
-              <div>
-                <h2>Node.js</h2>
-                <p class="muted">本机服务引擎 · 默认 :8999</p>
+              <div class="card-title-group">
+                <h2>Node.js 环境</h2>
+                <p class="muted">本机服务引擎 · 默认服务端口 :8999</p>
               </div>
               <span class="status" id="status-node">检测中</span>
             </div>
-            <div class="card-body">
+            <div class="card-body card-body-node">
               <div class="meta" id="meta-node">正在探测…</div>
-              <div class="env-row">
-                <label class="env-label" for="node-ver-select">版本</label>
-                <select id="node-ver-select" class="select select-version" title="Node 版本"></select>
-              </div>
-              <div class="card-actions">
-                <button type="button" class="btn primary" id="btn-install-node">安装</button>
-                <button type="button" class="btn soft danger" id="btn-uninstall-node" hidden>卸载</button>
+              <div class="node-controls">
+                <div class="env-row">
+                  <label class="env-label" for="node-ver-select">版本</label>
+                  <select id="node-ver-select" class="select select-version" title="Node 版本"></select>
+                </div>
+                <div class="card-actions">
+                  <button type="button" class="btn primary" id="btn-install-node">安装</button>
+                  <button type="button" class="btn soft danger" id="btn-uninstall-node" hidden>卸载</button>
+                </div>
               </div>
             </div>
           </article>
 
-          <article class="card" data-key="bit">
-            <div class="card-head">
-              <div class="icon-wrap bit">
-                <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M8 20h8"/><path d="M12 18v2"/><circle cx="8.5" cy="11" r="1.2" fill="currentColor" stroke="none"/><circle cx="15.5" cy="11" r="1.2" fill="currentColor" stroke="none"/></svg>
+          <!-- 两个浏览器占一行，各占 50% 区域 -->
+          <div class="browsers-row">
+            <!-- 比特浏览器 -->
+            <article class="card card-browser" data-key="bit">
+              <div class="card-head">
+                <div class="icon-wrap bit">
+                  <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M8 20h8"/><path d="M12 18v2"/><circle cx="8.5" cy="11" r="1.2" fill="currentColor" stroke="none"/><circle cx="15.5" cy="11" r="1.2" fill="currentColor" stroke="none"/></svg>
+                </div>
+                <div class="card-title-group">
+                  <h2>比特浏览器</h2>
+                  <p class="muted">指纹环境 · 本地 API :54345</p>
+                </div>
+                <span class="status" id="status-bit">检测中</span>
               </div>
-              <div>
-                <h2>比特浏览器</h2>
-                <p class="muted">指纹环境 · 本地 API :54345</p>
+              <div class="card-body">
+                <div class="meta" id="meta-bit">正在探测…</div>
+                <div class="env-row">
+                  <label class="env-label" for="bit-ver-select">版本</label>
+                  <select id="bit-ver-select" class="select select-version" title="比特版本"></select>
+                </div>
+                <div class="card-actions card-actions-browser">
+                  <button type="button" class="btn primary" id="btn-install-bit">安装</button>
+                  <button type="button" class="btn soft" id="btn-download-bit" title="下载安装包">下载</button>
+                  <button type="button" class="btn launch" id="btn-start-bit" hidden>启动</button>
+                  <button type="button" class="btn soft" id="btn-bit-locate" hidden>指定位置</button>
+                  <button type="button" class="btn soft danger" id="btn-uninstall-bit" hidden>卸载</button>
+                </div>
               </div>
-              <span class="status" id="status-bit">检测中</span>
-            </div>
-            <div class="card-body">
-              <div class="meta" id="meta-bit">正在探测…</div>
-              <div class="env-row">
-                <label class="env-label" for="bit-ver-select">版本</label>
-                <select id="bit-ver-select" class="select select-version" title="比特版本"></select>
+            </article>
+
+            <!-- 第一页自研浏览器 -->
+            <article class="card card-browser" data-key="self">
+              <div class="card-head">
+                <div class="icon-wrap self">
+                  <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8">
+                    <circle cx="12" cy="12" r="9"/>
+                    <circle cx="12" cy="12" r="4"/>
+                    <path d="M12 3v2"/>
+                    <path d="M12 19v2"/>
+                    <path d="M3 12h2"/>
+                    <path d="M19 12h2"/>
+                  </svg>
+                </div>
+                <div class="card-title-group">
+                  <h2>第一页自研浏览器</h2>
+                  <p class="muted">指纹环境 · 本地 API :54345</p>
+                </div>
+                <span class="status" id="status-self">检测中</span>
               </div>
-              <div class="card-actions card-actions-bit">
-                <button type="button" class="btn primary" id="btn-install-bit">安装</button>
-                <button type="button" class="btn soft danger" id="btn-uninstall-bit" hidden>卸载</button>
-                <button type="button" class="btn launch" id="btn-start-bit" hidden>启动</button>
-                <button type="button" class="btn soft" id="btn-bit-locate" hidden>指定位置</button>
+              <div class="card-body">
+                <p class="browser-intro" id="self-intro">第一页自研指纹浏览器，与视频矩阵账号环境无缝对接；版本由运营后台「环境安装包」统一发布。</p>
+                <div class="meta" id="meta-self">正在探测…</div>
+                <div class="env-row">
+                  <label class="env-label" for="self-ver-select">版本</label>
+                  <select id="self-ver-select" class="select select-version" title="自研浏览器版本"></select>
+                </div>
+                <div class="card-actions card-actions-browser">
+                  <button type="button" class="btn primary" id="btn-install-self">安装</button>
+                  <button type="button" class="btn soft" id="btn-download-self" title="下载安装包">下载</button>
+                  <button type="button" class="btn launch" id="btn-start-self" hidden>启动</button>
+                  <button type="button" class="btn soft" id="btn-self-locate">选择目录</button>
+                  <button type="button" class="btn soft danger" id="btn-uninstall-self" hidden>卸载</button>
+                </div>
               </div>
-            </div>
-          </article>
+            </article>
+          </div>
         </section>
 
         <section class="panel deploy-panel">
@@ -251,6 +295,10 @@
         <label class="field">
           <span>比特本地 API</span>
           <input type="url" id="bit-url-input" placeholder="http://127.0.0.1:54345">
+        </label>
+        <label class="field">
+          <span>第一页自研浏览器本地 API</span>
+          <input type="url" id="self-url-input" placeholder="http://127.0.0.1:54345">
         </label>
         <p class="hint">业务版本目录走线上 PHP API；本机检测仅用于环境就绪状态。</p>
         <div class="modal-actions">

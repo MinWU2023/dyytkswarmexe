@@ -21,14 +21,20 @@ contextBridge.exposeInMainWorld('tkswarmDesktop', {
   startService: (dir) => ipcRenderer.invoke('start-service', dir),
   detectNode: () => ipcRenderer.invoke('detect-node'),
   detectBit: (options) => ipcRenderer.invoke('detect-bit', options || {}),
+  detectSelf: (options) => ipcRenderer.invoke('detect-self', options || {}),
   pickBitExe: () => ipcRenderer.invoke('pick-bit-exe'),
+  pickSelfExe: () => ipcRenderer.invoke('pick-self-exe'),
   launchBit: (exePath) => ipcRenderer.invoke('launch-bit', exePath),
+  launchSelf: (exePath) => ipcRenderer.invoke('launch-self', exePath),
   isBitRunning: () => ipcRenderer.invoke('is-bit-running'),
+  isSelfRunning: () => ipcRenderer.invoke('is-self-running'),
   resolveNodeTools: () => ipcRenderer.invoke('resolve-node-tools'),
   installNode: (versionMeta) => ipcRenderer.invoke('install-node', versionMeta),
   uninstallNode: () => ipcRenderer.invoke('uninstall-node'),
   installBit: (payload) => ipcRenderer.invoke('install-bit', payload),
   uninstallBit: () => ipcRenderer.invoke('uninstall-bit'),
+  installSelf: (payload) => ipcRenderer.invoke('install-self', payload),
+  uninstallSelf: () => ipcRenderer.invoke('uninstall-self'),
   onDeployProgress: (handler) => {
     const listener = (_event, payload) => {
       if (typeof handler === 'function') handler(payload);

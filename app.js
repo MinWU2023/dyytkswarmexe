@@ -7,12 +7,14 @@
     api: 'tkswarm_exe_api_base',
     node: 'tkswarm_exe_node_url',
     bit: 'tkswarm_exe_bit_url',
+    self: 'tkswarm_exe_self_url',
     channel: 'tkswarm_exe_channel',
     deploy: 'tkswarm_exe_deploy_dir',
     token: 'tkswarm_exe_token',
     user: 'tkswarm_exe_user',
     rememberUser: 'tkswarm_exe_remember_user',
-    bitPath: 'tkswarm_exe_bit_path'
+    bitPath: 'tkswarm_exe_bit_path',
+    selfPath: 'tkswarm_exe_self_path'
   };
   var APP = { platform: 'unknown', version: CFG.appVersion || '1.0.0', defaultDeployDir: '' };
   var busy = false;
@@ -49,6 +51,10 @@
 
   function getBitUrl() {
     return stripSlash(localStorage.getItem(LS.bit) || CFG.bitApiUrl || 'http://127.0.0.1:54345');
+  }
+
+  function getSelfUrl() {
+    return stripSlash(localStorage.getItem(LS.self) || CFG.selfApiUrl || 'http://127.0.0.1:54345');
   }
 
   function getChannel() {
@@ -393,14 +399,17 @@
   var envState = {
     nodeInstalled: false,
     bitInstalled: false,
+    selfInstalled: false,
     bitPath: '',
+    selfPath: '',
     busy: false
   };
 
   /** 来自 API 的安装包目录；空则回退 CFG 本地列表 */
   var envCatalog = {
     node: [],
-    bit: []
+    bit: [],
+    self: []
   };
 
   function clientEnvPlatform() {
@@ -420,12 +429,44 @@
       id: String(it.id),
       version: String(it.version || ''),
       label: String(it.label || it.title || it.version || it.id),
+      notes: String(it.notes || it.description || ''),
       recommended: !!(it.recommended || it.isRecommended),
       downloadUrl: downloadUrl,
       winUrl: downloadUrl,
       macUrl: downloadUrl,
       fileName: String(it.fileName || '')
     };
+  }
+
+  var SELF_INTRO_DEFAULT = '第一页自研指纹浏览器，与视频矩阵账号环境无缝对接；版本由运营后台「环境安装包」统一发布。';
+
+  function updateSelfIntro() {
+    var introEl = $('self-intro');
+    if (!introEl) return;
+    var ver = getSelectedEnvVersion('self-ver-select', selfVersionList());
+    if (ver && ver.notes) {
+      introEl.textContent = ver.notes;
+      return;
+    }
+    introEl.textContent = SELF_INTRO_DEFAULT;
+  }
+
+  function mergeEnvCatalogItems(primary, secondary) {
+    var out = (primary || []).slice();
+    var seen = {};
+    out.forEach(function (it) { seen[String(it.id)] = true; });
+    (secondary || []).forEach(function (it) {
+      var key = String(it.id);
+      if (!seen[key]) {
+        seen[key] = true;
+        out.push(it);
+      }
+    });
+    out.sort(function (a, b) {
+      if (a.recommended !== b.recommended) return a.recommended ? -1 : 1;
+      return String(b.version || '').localeCompare(String(a.version || ''), undefined, { numeric: true });
+    });
+    return out;
   }
 
   function nodeVersionList() {
@@ -436,10 +477,15 @@
     return (envCatalog.bit && envCatalog.bit.length) ? envCatalog.bit : (CFG.bitVersions || []);
   }
 
+  function selfVersionList() {
+    return (envCatalog.self && envCatalog.self.length) ? envCatalog.self : (CFG.selfVersions || []);
+  }
+
   async function loadEnvCatalogs() {
     var plat = clientEnvPlatform();
     var nodeList = CFG.nodeVersions || [];
     var bitList = CFG.bitVersions || [];
+    var selfList = CFG.selfVersions || [];
     try {
       var nodeCat = await apiGet('/env-installers/catalog?kind=node&platform=' + encodeURIComponent(plat));
       var nItems = (nodeCat && nodeCat.items) || [];
@@ -450,10 +496,26 @@
       var bItems = (bitCat && bitCat.items) || [];
       if (bItems.length) bitList = bItems.map(mapEnvCatalogItem);
     } catch (e2) { /* 同上 */ }
+    try {
+      var selfItems = [];
+      try {
+        var selfCat = await apiGet('/env-installers/catalog?kind=self&platform=' + encodeURIComponent(plat));
+        selfItems = ((selfCat && selfCat.items) || []).map(mapEnvCatalogItem);
+      } catch (eSelf) { /* ignore */ }
+      try {
+        var tkCat = await apiGet('/env-installers/catalog?kind=tkswarm&platform=' + encodeURIComponent(plat));
+        var tkItems = ((tkCat && tkCat.items) || []).map(mapEnvCatalogItem);
+        selfItems = mergeEnvCatalogItems(selfItems, tkItems);
+      } catch (eTk) { /* ignore */ }
+      if (selfItems.length) selfList = selfItems;
+    } catch (e3) { /* 同上 */ }
     envCatalog.node = nodeList;
     envCatalog.bit = bitList;
+    envCatalog.self = selfList;
     fillEnvVersionSelect('node-ver-select', envCatalog.node);
     fillEnvVersionSelect('bit-ver-select', envCatalog.bit);
+    fillEnvVersionSelect('self-ver-select', envCatalog.self);
+    updateSelfIntro();
   }
 
   function pickRecommended(list) {
@@ -471,6 +533,7 @@
     if (!items.length) {
       sel.innerHTML = '<option value="">暂无版本</option>';
       refreshPrettySelect(sel);
+      if (selectId === 'self-ver-select') updateSelfIntro();
       return;
     }
     var rec = pickRecommended(items);
@@ -479,6 +542,7 @@
     }).join('');
     if (rec) sel.value = String(rec.id);
     refreshPrettySelect(sel);
+    if (selectId === 'self-ver-select') updateSelfIntro();
   }
 
   function getSelectedEnvVersion(selectId, list) {
@@ -518,6 +582,22 @@
         locateBtn.textContent = hasPath ? '更改位置' : '指定位置';
         locateBtn.classList.toggle('primary', !hasPath && !!installed);
         locateBtn.classList.toggle('soft', !(!hasPath && !!installed));
+      }
+    }
+    if (target === 'self') {
+      var hasSelfPath = !!(envState.selfPath || localStorage.getItem(LS.selfPath));
+      var startSelfBtn = $('btn-start-self');
+      var locateSelfBtn = $('btn-self-locate');
+      if (startSelfBtn) {
+        startSelfBtn.hidden = !(installed && hasSelfPath);
+        startSelfBtn.disabled = !!envState.busy;
+      }
+      if (locateSelfBtn) {
+        locateSelfBtn.hidden = false;
+        locateSelfBtn.disabled = !!envState.busy;
+        locateSelfBtn.textContent = '选择目录';
+        locateSelfBtn.classList.toggle('primary', !hasSelfPath && !!installed);
+        locateSelfBtn.classList.toggle('soft', !(!hasSelfPath && !!installed));
       }
     }
   }
@@ -566,6 +646,27 @@
       }
     } catch (e2) {
       setEnvButtons('bit', false);
+    }
+    try {
+      var selfInfo = (DESK && DESK.detectSelf)
+        ? await DESK.detectSelf({ selfApiUrl: getSelfUrl(), hintPath: localStorage.getItem(LS.selfPath) || '' })
+        : null;
+      envState.selfInstalled = !!(selfInfo && selfInfo.installed);
+      if (selfInfo && selfInfo.path) {
+        envState.selfPath = selfInfo.path;
+        localStorage.setItem(LS.selfPath, selfInfo.path);
+      } else {
+        envState.selfPath = localStorage.getItem(LS.selfPath) || '';
+      }
+      setEnvButtons('self', envState.selfInstalled);
+      if (envState.selfInstalled) {
+        var tip3 = '已安装第一页自研浏览器'
+          + (selfInfo.version ? ' v' + selfInfo.version : '')
+          + (selfInfo.path || envState.selfPath ? '<br><code>' + esc(selfInfo.path || envState.selfPath) + '</code>' : '');
+        $('meta-self') && ($('meta-self').dataset.installTip = tip3);
+      }
+    } catch (e3) {
+      setEnvButtons('self', false);
     }
   }
 
@@ -681,6 +782,71 @@
     return false;
   }
 
+  async function checkSelf() {
+    setStatus('self', 'checking', '正在检测第一页自研浏览器…');
+    var installTip = '';
+    envState.selfInstalled = false;
+    envState.selfPath = localStorage.getItem(LS.selfPath) || '';
+    var base = getSelfUrl();
+
+    if (DESK && DESK.detectSelf) {
+      try {
+        var info = await DESK.detectSelf({
+          selfApiUrl: base,
+          hintPath: localStorage.getItem(LS.selfPath) || ''
+        });
+        envState.selfInstalled = !!(info && info.installed);
+        if (info && info.path) {
+          envState.selfPath = info.path;
+          localStorage.setItem(LS.selfPath, info.path);
+        }
+        setEnvButtons('self', envState.selfInstalled);
+        if (info && info.installed) {
+          installTip = '已安装第一页自研浏览器'
+            + (info.version ? ' v' + info.version : '')
+            + (info.path ? '<br><code>' + esc(info.path) + '</code>' : '')
+            + (!info.path ? '<br><span class="muted">请点击「选择目录」指定可执行程序，即可显示启动按钮</span>' : '');
+        } else {
+          installTip = '未检测到第一页自研浏览器。可选择版本后点「安装」，或先安装后「选择目录」。';
+        }
+      } catch (e) {
+        setEnvButtons('self', false);
+        installTip = '检测第一页自研浏览器失败：' + esc((e && e.message) || e);
+      }
+    }
+
+    var r = await probeFetch(base + '/health', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: '{}'
+    });
+    if (r.ok && r.json && (r.json.success === true || r.json.success === 'true' || r.json.data != null)) {
+      envState.selfInstalled = true;
+      setEnvButtons('self', true);
+      setStatus('self', 'online', (installTip ? installTip + '<br>' : '') + '自研服务在线 <code>' + esc(base) + '</code>');
+      return true;
+    }
+    if (r.ok) {
+      envState.selfInstalled = true;
+      setEnvButtons('self', true);
+      setStatus('self', 'online', (installTip ? installTip + '<br>' : '') + '自研 API 有响应（HTTP ' + r.status + '）');
+      return true;
+    }
+    if (r.cors) {
+      envState.selfInstalled = true;
+      setEnvButtons('self', true);
+      setStatus('self', 'warn', (installTip ? installTip + '<br>' : '') + '端口有响应，但无法确认详情。');
+      return null;
+    }
+    if (!envState.selfInstalled) {
+      setStatus('self', 'offline', installTip + '<br>选择版本后点击「安装」。');
+      return false;
+    }
+      setStatus('self', 'installed',
+      installTip + '<br>请启动第一页自研浏览器并开启本地服务 <code>' + esc(base) + '</code>');
+    return false;
+  }
+
   async function runEnvAction(kind, action) {
     if (!DESK || !DESK.isElectron) {
       toast('请在桌面客户端中操作', 'error');
@@ -755,21 +921,72 @@
         var bv2 = getSelectedEnvVersion('bit-ver-select', bitVersionList());
         await DESK.installBit({ version: bv2, localFile: file });
         toast('已启动本地安装包', 'ok');
+      } else if (kind === 'self' && action === 'install') {
+        var sv = getSelectedEnvVersion('self-ver-select', selfVersionList());
+        var hasSelfUrl = !!(sv && (sv.downloadUrl || sv.winUrl || sv.macUrl));
+        if (hasSelfUrl) {
+          if (DESK.installSelf) {
+            await DESK.installSelf({ version: sv });
+            toast('自研浏览器安装流程已完成', 'ok');
+          } else {
+            toast('当前客户端不支持自研安装', 'error');
+          }
+        } else {
+          // 无直链时改为选择本地安装包
+          var sfile = await DESK.pickInstallerFile();
+          if (!sfile) return;
+          if (DESK.installSelf) {
+            await DESK.installSelf({ version: sv || {}, localFile: sfile });
+            toast('已启动自研浏览器安装包', 'ok');
+          } else {
+            toast('当前客户端不支持自研安装', 'error');
+          }
+        }
+      } else if (kind === 'self' && action === 'uninstall') {
+        if (DESK.showConfirm) {
+          var okSelfUn = await DESK.showConfirm({
+            title: '卸载自研浏览器',
+            message: '将结束自研浏览器进程并启动卸载程序。',
+            detail: '若弹出 UAC 请点「是」。',
+            buttons: ['取消', '继续卸载'],
+            confirmIndex: 1
+          });
+          if (!okSelfUn) return;
+        }
+        if (DESK.uninstallSelf) {
+          await DESK.uninstallSelf();
+          toast('自研浏览器已卸载', 'ok');
+          localStorage.removeItem(LS.selfPath);
+          envState.selfPath = '';
+        } else {
+          toast('当前客户端不支持自研卸载', 'error');
+        }
+      } else if (kind === 'self' && action === 'local') {
+        var sfile2 = await DESK.pickInstallerFile();
+        if (!sfile2) return;
+        var sv2 = getSelectedEnvVersion('self-ver-select', selfVersionList());
+        if (DESK.installSelf) {
+          await DESK.installSelf({ version: sv2, localFile: sfile2 });
+          toast('已启动自研浏览器安装包', 'ok');
+        } else {
+          toast('当前客户端不支持自研安装', 'error');
+        }
       }
       // 安装后 PATH 可能尚未刷新，稍等再检
       await new Promise(function (r) { setTimeout(r, 1200); });
       await refreshEnvInstallState();
-      await Promise.all([checkNode(), checkBit()]);
+      await Promise.all([checkNode(), checkBit(), checkSelf()]);
     } catch (err) {
       toast((err && err.message) || String(err), 'error');
       await refreshEnvInstallState();
-      await Promise.all([checkNode(), checkBit()]);
+      await Promise.all([checkNode(), checkBit(), checkSelf()]);
     } finally {
       if (typeof off === 'function') off();
       envState.busy = false;
       showProgress(false);
       setEnvButtons('node', envState.nodeInstalled);
       setEnvButtons('bit', envState.bitInstalled);
+      setEnvButtons('self', envState.selfInstalled);
     }
   }
 
@@ -1218,12 +1435,19 @@
       } catch (e2) {
         envState.bitInstalled = false;
       }
+      try {
+        var selfInfo = DESK.detectSelf ? await DESK.detectSelf({ selfApiUrl: getSelfUrl(), hintPath: localStorage.getItem(LS.selfPath) || '' }) : null;
+        envState.selfInstalled = !!(selfInfo && selfInfo.installed);
+      } catch (e3) {
+        envState.selfInstalled = false;
+      }
       setEnvButtons('node', envState.nodeInstalled);
       setEnvButtons('bit', envState.bitInstalled);
+      setEnvButtons('self', envState.selfInstalled);
     }
     var missing = [];
     if (!envState.nodeInstalled) missing.push('Node.js');
-    if (!envState.bitInstalled) missing.push('比特浏览器');
+    if (!envState.bitInstalled && !envState.selfInstalled) missing.push('比特浏览器或第一页自研浏览器（至少安装其一）');
     if (missing.length) {
       toast('请先安装好环境再部署：' + missing.join('、'), 'error');
       return false;
@@ -1336,7 +1560,7 @@
   }
 
   async function recheckAll() {
-    await Promise.all([checkNode(), checkBit()]);
+    await Promise.all([checkNode(), checkBit(), checkSelf()]);
     toast('环境检测完成', 'ok');
   }
 
@@ -1344,6 +1568,7 @@
     $('api-base-input').value = getApiBase();
     $('node-url-input').value = getNodeUrl();
     $('bit-url-input').value = getBitUrl();
+    if ($('self-url-input')) $('self-url-input').value = getSelfUrl();
     $('settings-modal').hidden = false;
   }
 
@@ -1403,6 +1628,7 @@
       localStorage.removeItem(LS.api);
       localStorage.removeItem(LS.node);
       localStorage.removeItem(LS.bit);
+      localStorage.removeItem(LS.self);
       openSettings();
       toast('已恢复默认', 'ok');
       loadEnvCatalogs().catch(function () { /* ignore */ });
@@ -1412,6 +1638,7 @@
       localStorage.setItem(LS.api, stripSlash($('api-base-input').value));
       localStorage.setItem(LS.node, stripSlash($('node-url-input').value));
       localStorage.setItem(LS.bit, stripSlash($('bit-url-input').value));
+      if ($('self-url-input')) localStorage.setItem(LS.self, stripSlash($('self-url-input').value));
       closeSettings();
       updatePills();
       toast('设置已保存', 'ok');
@@ -1432,6 +1659,78 @@
     });
     $('btn-uninstall-bit') && $('btn-uninstall-bit').addEventListener('click', function () {
       runEnvAction('bit', 'uninstall');
+    });
+    $('btn-download-bit') && $('btn-download-bit').addEventListener('click', function () {
+      var bv = getSelectedEnvVersion('bit-ver-select', bitVersionList());
+      var url = bv && (bv.downloadUrl || bv.winUrl || bv.macUrl);
+      if (url) openExternal(url);
+      else openExternal((CFG.downloads && CFG.downloads.bitDownload) || 'https://www.bitbrowser.cn/download');
+    });
+    $('btn-install-self') && $('btn-install-self').addEventListener('click', function () {
+      runEnvAction('self', 'install');
+    });
+    $('btn-uninstall-self') && $('btn-uninstall-self').addEventListener('click', function () {
+      runEnvAction('self', 'uninstall');
+    });
+    $('btn-download-self') && $('btn-download-self').addEventListener('click', function () {
+      var sv = getSelectedEnvVersion('self-ver-select', selfVersionList());
+      var url = sv && (sv.downloadUrl || sv.winUrl || sv.macUrl);
+      if (url) {
+        openExternal(url);
+        toast('已开始下载' + (sv.version ? ' v' + sv.version : ''), 'ok');
+      } else {
+        toast('未配置第一页自研浏览器下载地址，请在后台「环境安装包」上传或选择本地安装包安装', 'error');
+      }
+    });
+    $('self-ver-select') && $('self-ver-select').addEventListener('change', updateSelfIntro);
+    $('btn-start-self') && $('btn-start-self').addEventListener('click', async function () {
+      if (!DESK || !DESK.launchSelf) {
+        toast('请在桌面客户端中操作', 'error');
+        return;
+      }
+      var exePath = envState.selfPath || localStorage.getItem(LS.selfPath) || '';
+      if (!exePath) {
+        toast('请先点击「选择目录」指定第一页自研浏览器可执行程序', 'error');
+        return;
+      }
+      try {
+        var result = await DESK.launchSelf(exePath);
+        if (result && result.alreadyRunning) {
+          if (DESK.showMessage) {
+            await DESK.showMessage({
+              type: 'info',
+              title: '第一页自研浏览器',
+              message: '第一页自研浏览器已启动',
+              detail: '本地程序正在运行中，可直接使用第一页指纹环境。\n请确认本地服务已开启：' + getSelfUrl()
+            });
+          } else {
+            toast('第一页自研浏览器已启动', 'ok');
+          }
+          return;
+        }
+        toast('正在启动第一页自研浏览器…', 'ok');
+        setTimeout(checkSelf, 2000);
+      } catch (err) {
+        toast((err && err.message) || String(err), 'error');
+      }
+    });
+    $('btn-self-locate') && $('btn-self-locate').addEventListener('click', async function () {
+      if (!DESK || !DESK.pickSelfExe) {
+        toast('请在桌面客户端中操作', 'error');
+        return;
+      }
+      try {
+        var file = await DESK.pickSelfExe();
+        if (!file) return;
+        localStorage.setItem(LS.selfPath, file);
+        envState.selfPath = file;
+        envState.selfInstalled = true;
+        setEnvButtons('self', true);
+        toast('已记录第一页自研浏览器目录', 'ok');
+        await checkSelf();
+      } catch (err) {
+        toast((err && err.message) || String(err), 'error');
+      }
     });
     $('btn-start-bit') && $('btn-start-bit').addEventListener('click', async function () {
       if (!DESK || !DESK.launchBit) {
@@ -1552,6 +1851,8 @@
 
     fillEnvVersionSelect('node-ver-select', CFG.nodeVersions || []);
     fillEnvVersionSelect('bit-ver-select', CFG.bitVersions || []);
+    fillEnvVersionSelect('self-ver-select', CFG.selfVersions || []);
+    updateSelfIntro();
     enhanceAllSelects();
 
     bind();

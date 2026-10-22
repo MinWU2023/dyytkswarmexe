@@ -10,6 +10,7 @@ window.__TKSWARM_EXE_CONFIG__ = {
   defaultApiBase: 'http://tkswarm-api.dyyweb.com',
   nodeHealthUrl: 'http://127.0.0.1:8999/api/health',
   bitApiUrl: 'http://127.0.0.1:54345',
+  selfApiUrl: 'http://127.0.0.1:54345',
   downloads: {
     node: 'https://nodejs.org/zh-cn/download/',
     bit: 'https://www.bitbrowser.cn/',
@@ -35,5 +36,15 @@ window.__TKSWARM_EXE_CONFIG__ = {
     }
   ],
   /** API 不可用且无直链时无法自动安装比特，需后台发布或「选择安装包」 */
-  bitVersions: []
+  bitVersions: [],
+  /** API 不可用时的自研浏览器兜底 */
+  selfVersions: [
+    {
+      id: '1.0.2',
+      version: '1.0.2',
+      label: '1.0.2 正式版（自研指纹内核·推荐）',
+      recommended: true,
+      downloadUrl: ''
+    }
+  ]
 };

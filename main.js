@@ -527,6 +527,7 @@ function registerIpc() {
 
   ipcMain.handle('detect-node', async () => envInstall.detectNode());
   ipcMain.handle('detect-bit', async (_e, options) => envInstall.detectBit(options || {}));
+  ipcMain.handle('detect-self', async (_e, options) => envInstall.detectSelf(options || {}));
   ipcMain.handle('resolve-node-tools', async () => {
     const tools = await envInstall.resolveNodeTools();
     return {
@@ -568,6 +569,28 @@ function registerIpc() {
     return envInstall.isBitProcessRunning();
   });
 
+  ipcMain.handle('install-self', async (_e, payload) => {
+    const cacheDir = path.join(app.getPath('temp'), 'TkSwarm-Client', 'installers');
+    const versionMeta = (payload && payload.version) || payload || {};
+    return envInstall.installSelf(versionMeta, {
+      cacheDir,
+      localFile: payload && payload.localFile,
+      waitMs: (payload && payload.waitMs) || 180000
+    }, (p) => sendEnvProgress(Object.assign({ target: 'self' }, p)));
+  });
+
+  ipcMain.handle('uninstall-self', async () => {
+    return envInstall.uninstallSelf((p) => sendEnvProgress(Object.assign({ target: 'self' }, p)));
+  });
+
+  ipcMain.handle('launch-self', async (_e, exePath) => {
+    return envInstall.launchSelf(exePath);
+  });
+
+  ipcMain.handle('is-self-running', async () => {
+    return envInstall.isSelfProcessRunning();
+  });
+
   ipcMain.handle('pick-installer-file', async () => {
     const result = await dialog.showOpenDialog(mainWindow, {
       title: '选择安装包',
@@ -584,6 +607,19 @@ function registerIpc() {
   ipcMain.handle('pick-bit-exe', async () => {
     const result = await dialog.showOpenDialog(mainWindow, {
       title: '选择已安装的比特浏览器程序（BitBrowser.exe）',
+      filters: [
+        { name: '可执行文件', extensions: ['exe'] },
+        { name: '全部', extensions: ['*'] }
+      ],
+      properties: ['openFile']
+    });
+    if (result.canceled || !result.filePaths.length) return null;
+    return result.filePaths[0];
+  });
+
+  ipcMain.handle('pick-self-exe', async () => {
+    const result = await dialog.showOpenDialog(mainWindow, {
+      title: '选择已安装的自研浏览器程序（TkSwarmBrowser.exe / 第一页自研浏览器.exe）',
       filters: [
         { name: '可执行文件', extensions: ['exe'] },
         { name: '全部', extensions: ['*'] }
