@@ -323,9 +323,9 @@ async function startService(dir) {
 
 function createWindow() {
   mainWindow = new BrowserWindow({
-    width: 1120,
-    height: 780,
-    minWidth: 900,
+    width: 1280,
+    height: 800,
+    minWidth: 1080,
     minHeight: 640,
     show: false,
     backgroundColor: '#e8f4ff',

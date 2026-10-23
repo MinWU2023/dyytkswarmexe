@@ -23,6 +23,8 @@
 * { box-sizing: border-box; }
 html, body {
   height: 100%;
+  width: 100%;
+  min-width: 1080px;
   margin: 0;
   overflow: hidden; /* Electron 窗口内不出现整页竖直滚动条 */
 }
@@ -56,15 +58,15 @@ body {
 
 .app-shell {
   position: relative; z-index: 1;
-  max-width: 980px;
+  width: 100%;
   height: 100%;
-  margin: 0 auto;
-  padding: 10px 16px 12px;
+  padding: 10px 20px 12px;
   display: flex;
   flex-direction: column;
   gap: 10px;
   overflow: hidden;
   min-height: 0;
+  box-sizing: border-box;
 }
 
 .app-nav {
@@ -99,7 +101,7 @@ body {
   box-shadow: 0 6px 16px rgba(26, 125, 255, 0.28);
 }
 
-.page { display: flex; flex-direction: column; gap: 12px; min-height: 0; flex: 1; }
+.page { display: flex; flex-direction: column; gap: 12px; min-height: 0; flex: 1; width: 100%; }
 .page[hidden] { display: none !important; }
 
 .docs-layout {
@@ -321,10 +323,12 @@ body {
   flex-direction: column;
   gap: 12px;
   flex: 1;
+  width: 100%;
   min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
   padding-right: 2px;
+  box-sizing: border-box;
   /* 隐藏竖直滚动条（内容增高时仍可滚轮滚动） */
   scrollbar-width: none;
   -ms-overflow-style: none;
@@ -354,7 +358,6 @@ body {
   color: var(--ink-soft);
   line-height: 1.55;
   font-size: 14.5px;
-  white-space: nowrap;
 }
 
 .cards,
@@ -395,7 +398,7 @@ body {
   line-height: 1.55;
   color: var(--ink-soft);
 }
-@media (max-width: 768px) {
+@media (max-width: 1280px) {
   .browsers-row { grid-template-columns: 1fr; }
 }
 
