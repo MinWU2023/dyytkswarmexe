@@ -1,6 +1,6 @@
 {
   "name": "tkswarm-client",
-  "version": "1.0.18",
+  "version": "1.0.19",
   "description": "TKSwarm 客服端安装助手（Electron）",
   "author": "TKSwarm",
   "license": "UNLICENSED",
