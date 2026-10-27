@@ -373,6 +373,49 @@ body {
 .cards.has-open-select,
 .env-section.has-open-select { z-index: 40; }
 
+/* Node + 自研：大屏同行各 50%，小屏各自占满一行 */
+.env-core-row,
+.env-pair-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  align-items: stretch;
+}
+.env-core-row > .card,
+.env-pair-row > .card {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.env-core-row .card-browser .card-body,
+.env-core-row .card-self .card-body,
+.env-pair-row .card-browser .card-body,
+.env-pair-row .card-self .card-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+.env-core-row .card-actions-browser,
+.env-pair-row .card-actions-browser {
+  margin-top: auto;
+}
+/* 并排时 Node 卡片内部改为纵向，避免半宽挤成一行 */
+.env-pair-row .card-node .card-body-node,
+.env-core-row .card-node .card-body-node {
+  flex-direction: column;
+  align-items: stretch;
+}
+.env-pair-row .card-node .card-body-node .meta,
+.env-core-row .card-node .card-body-node .meta {
+  flex: 0 0 auto;
+}
+.env-pair-row .card-node .node-controls,
+.env-core-row .card-node .node-controls {
+  width: 100%;
+  justify-content: space-between;
+}
+/* 兼容旧类名 */
 .browsers-row {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -398,8 +441,18 @@ body {
   line-height: 1.55;
   color: var(--ink-soft);
 }
+/* 比特部署板块暂时隐藏 */
+.bit-deploy-row,
+.card.is-bit-hidden,
+[data-key="bit"].is-bit-hidden {
+  display: none !important;
+}
 @media (max-width: 1280px) {
-  .browsers-row { grid-template-columns: 1fr; }
+  .env-core-row,
+  .env-pair-row,
+  .browsers-row {
+    grid-template-columns: 1fr;
+  }
 }
 
 .card {

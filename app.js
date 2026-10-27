@@ -1422,7 +1422,8 @@
   }
 
   async function ensureEnvReadyForDeploy() {
-    if (DESK && DESK.detectNode && DESK.detectBit) {
+    // 启动/部署前置：Node 已装 + 第一页自研浏览器已装（比特板块已隐藏，不再作为条件）
+    if (DESK && DESK.detectNode) {
       try {
         var nodeInfo = await DESK.detectNode();
         envState.nodeInstalled = !!(nodeInfo && nodeInfo.installed);
@@ -1430,26 +1431,21 @@
         envState.nodeInstalled = false;
       }
       try {
-        var bitInfo = await DESK.detectBit({ bitApiUrl: getBitUrl(), hintPath: localStorage.getItem(LS.bitPath) || '' });
-        envState.bitInstalled = !!(bitInfo && bitInfo.installed);
-      } catch (e2) {
-        envState.bitInstalled = false;
-      }
-      try {
-        var selfInfo = DESK.detectSelf ? await DESK.detectSelf({ selfApiUrl: getSelfUrl(), hintPath: localStorage.getItem(LS.selfPath) || '' }) : null;
+        var selfInfo = DESK.detectSelf
+          ? await DESK.detectSelf({ selfApiUrl: getSelfUrl(), hintPath: localStorage.getItem(LS.selfPath) || '' })
+          : null;
         envState.selfInstalled = !!(selfInfo && selfInfo.installed);
       } catch (e3) {
         envState.selfInstalled = false;
       }
       setEnvButtons('node', envState.nodeInstalled);
-      setEnvButtons('bit', envState.bitInstalled);
       setEnvButtons('self', envState.selfInstalled);
     }
     var missing = [];
     if (!envState.nodeInstalled) missing.push('Node.js');
-    if (!envState.bitInstalled && !envState.selfInstalled) missing.push('比特浏览器或第一页自研浏览器（至少安装其一）');
+    if (!envState.selfInstalled) missing.push('第一页自研浏览器');
     if (missing.length) {
-      toast('请先安装好环境再部署：' + missing.join('、'), 'error');
+      toast('请先安装好环境再部署/启动：' + missing.join('、'), 'error');
       return false;
     }
     return true;

@@ -72,68 +72,38 @@
       <div class="page" id="page-home">
         <section class="hero">
           <h1>视频矩阵 · 本机就绪</h1>
-          <p>检测 Node / 比特浏览器 / 第一页自研浏览器，引导安装，并从版本中心一键部署矩阵程序。</p>
+          <p>检测 Node.js 与第一页自研浏览器，引导安装，并从版本中心一键部署矩阵程序。</p>
         </section>
 
         <section class="env-section" id="env-cards">
-          <!-- Node 环境单独占一行 -->
-          <article class="card card-node" data-key="node">
-            <div class="card-head">
-              <div class="icon-wrap node">
-                <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2l8.5 4.9v9.8L12 22l-8.5-5.3V6.9L12 2z"/><path d="M12 22V12"/><path d="M20.5 6.9L12 12 3.5 6.9"/></svg>
-              </div>
-              <div class="card-title-group">
-                <h2>Node.js 环境</h2>
-                <p class="muted">本机服务引擎 · 默认服务端口 :8999</p>
-              </div>
-              <span class="status" id="status-node">检测中</span>
-            </div>
-            <div class="card-body card-body-node">
-              <div class="meta" id="meta-node">正在探测…</div>
-              <div class="node-controls">
-                <div class="env-row">
-                  <label class="env-label" for="node-ver-select">版本</label>
-                  <select id="node-ver-select" class="select select-version" title="Node 版本"></select>
-                </div>
-                <div class="card-actions">
-                  <button type="button" class="btn primary" id="btn-install-node">安装</button>
-                  <button type="button" class="btn soft danger" id="btn-uninstall-node" hidden>卸载</button>
-                </div>
-              </div>
-            </div>
-          </article>
-
-          <!-- 两个浏览器占一行，各占 50% 区域 -->
-          <div class="browsers-row">
-            <!-- 比特浏览器 -->
-            <article class="card card-browser" data-key="bit">
+          <!-- 大屏 Node + 自研各 50% 同行；小屏各自占满一行。比特部署暂隐 -->
+          <div class="env-pair-row">
+            <article class="card card-node" data-key="node">
               <div class="card-head">
-                <div class="icon-wrap bit">
-                  <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M8 20h8"/><path d="M12 18v2"/><circle cx="8.5" cy="11" r="1.2" fill="currentColor" stroke="none"/><circle cx="15.5" cy="11" r="1.2" fill="currentColor" stroke="none"/></svg>
+                <div class="icon-wrap node">
+                  <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2l8.5 4.9v9.8L12 22l-8.5-5.3V6.9L12 2z"/><path d="M12 22V12"/><path d="M20.5 6.9L12 12 3.5 6.9"/></svg>
                 </div>
                 <div class="card-title-group">
-                  <h2>比特浏览器</h2>
-                  <p class="muted">指纹环境 · 本地 API :54345</p>
+                  <h2>Node.js 环境</h2>
+                  <p class="muted">本机服务引擎 · 默认服务端口 :8999</p>
                 </div>
-                <span class="status" id="status-bit">检测中</span>
+                <span class="status" id="status-node">检测中</span>
               </div>
-              <div class="card-body">
-                <div class="meta" id="meta-bit">正在探测…</div>
-                <div class="env-row">
-                  <label class="env-label" for="bit-ver-select">版本</label>
-                  <select id="bit-ver-select" class="select select-version" title="比特版本"></select>
-                </div>
-                <div class="card-actions card-actions-browser">
-                  <button type="button" class="btn primary" id="btn-install-bit">安装</button>
-                  <button type="button" class="btn soft" id="btn-download-bit" title="下载安装包">下载</button>
-                  <button type="button" class="btn launch" id="btn-start-bit" hidden>启动</button>
-                  <button type="button" class="btn soft" id="btn-bit-locate" hidden>指定位置</button>
-                  <button type="button" class="btn soft danger" id="btn-uninstall-bit" hidden>卸载</button>
+              <div class="card-body card-body-node">
+                <div class="meta" id="meta-node">正在探测…</div>
+                <div class="node-controls">
+                  <div class="env-row">
+                    <label class="env-label" for="node-ver-select">版本</label>
+                    <select id="node-ver-select" class="select select-version" title="Node 版本"></select>
+                  </div>
+                  <div class="card-actions">
+                    <button type="button" class="btn primary" id="btn-install-node">安装</button>
+                    <button type="button" class="btn soft danger" id="btn-uninstall-node" hidden>卸载</button>
+                  </div>
                 </div>
               </div>
             </article>
 
-            <!-- 第一页自研浏览器 -->
             <article class="card card-browser" data-key="self">
               <div class="card-head">
                 <div class="icon-wrap self">
@@ -165,6 +135,36 @@
                   <button type="button" class="btn launch" id="btn-start-self" hidden>启动</button>
                   <button type="button" class="btn soft" id="btn-self-locate">选择目录</button>
                   <button type="button" class="btn soft danger" id="btn-uninstall-self" hidden>卸载</button>
+                </div>
+              </div>
+            </article>
+          </div>
+
+          <!-- 比特浏览器部署板块：暂时隐藏（DOM 保留，便于后续恢复） -->
+          <div class="browsers-row bit-deploy-row" hidden aria-hidden="true">
+            <article class="card card-browser" data-key="bit">
+              <div class="card-head">
+                <div class="icon-wrap bit">
+                  <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M8 20h8"/><path d="M12 18v2"/><circle cx="8.5" cy="11" r="1.2" fill="currentColor" stroke="none"/><circle cx="15.5" cy="11" r="1.2" fill="currentColor" stroke="none"/></svg>
+                </div>
+                <div class="card-title-group">
+                  <h2>比特浏览器</h2>
+                  <p class="muted">指纹环境 · 本地 API :54345</p>
+                </div>
+                <span class="status" id="status-bit">检测中</span>
+              </div>
+              <div class="card-body">
+                <div class="meta" id="meta-bit">正在探测…</div>
+                <div class="env-row">
+                  <label class="env-label" for="bit-ver-select">版本</label>
+                  <select id="bit-ver-select" class="select select-version" title="比特版本"></select>
+                </div>
+                <div class="card-actions card-actions-browser">
+                  <button type="button" class="btn primary" id="btn-install-bit">安装</button>
+                  <button type="button" class="btn soft" id="btn-download-bit" title="下载安装包">下载</button>
+                  <button type="button" class="btn launch" id="btn-start-bit" hidden>启动</button>
+                  <button type="button" class="btn soft" id="btn-bit-locate" hidden>指定位置</button>
+                  <button type="button" class="btn soft danger" id="btn-uninstall-bit" hidden>卸载</button>
                 </div>
               </div>
             </article>
@@ -292,7 +292,7 @@
           <span>Node 健康检查 URL</span>
           <input type="url" id="node-url-input" placeholder="http://127.0.0.1:8999/api/health">
         </label>
-        <label class="field">
+        <label class="field" hidden aria-hidden="true">
           <span>比特本地 API</span>
           <input type="url" id="bit-url-input" placeholder="http://127.0.0.1:54345">
         </label>
