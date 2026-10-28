@@ -66,7 +66,10 @@ jobs:
           fi
           npm run dist:ci
 
-      - name: Upload artifacts
+      # PR / 手动跑：走 Actions Artifact（免费额度易满，失败不阻断构建）
+      - name: Upload artifacts (CI only)
+        if: github.ref_type != 'tag'
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: tkswarm-client-${{ matrix.artifact }}-${{ github.sha }}
@@ -78,33 +81,22 @@ jobs:
             dist/latest*.yml
             dist/*.blockmap
           if-no-files-found: warn
-          retention-days: 14
+          retention-days: 3
 
-  release:
-    name: GitHub Release
-    needs: build
-    if: startsWith(github.ref, 'refs/tags/client-v')
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - name: Download all artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: release-assets
-
-      - name: Collect release files
-        shell: bash
-        run: |
-          mkdir -p out
-          find release-assets -type f \( -name '*.exe' -o -name '*.dmg' -o -name '*.zip' -o -name '*.AppImage' -o -name '*.yml' -o -name '*.blockmap' \) -print -exec cp {} out/ \;
-          ls -la out
-
-      - name: Create GitHub Release
+      # tag 发版：直接挂到 GitHub Release（不占 Artifact 存储配额）
+      - name: Attach to GitHub Release
+        if: startsWith(github.ref, 'refs/tags/client-v')
         uses: softprops/action-gh-release@v2
         with:
-          files: out/*
+          files: |
+            dist/*.exe
+            dist/*.dmg
+            dist/*.zip
+            dist/*.AppImage
+            dist/latest*.yml
+            dist/*.blockmap
           generate_release_notes: true
           draft: false
+          fail_on_unmatched_files: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
